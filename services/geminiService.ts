@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Modality, LiveServerMessage } from "@google/genai";
-import { GREETING_MESSAGE, LIVE_MODEL_NAME, SYSTEM_INSTRUCTION, TTS_MODEL_NAME } from '../constants';
+import { LIVE_MODEL_NAME, TTS_MODEL_NAME } from '../constants';
 
 if (!process.env.API_KEY) {
   throw new Error("API_KEY environment variable not set");
@@ -8,16 +8,16 @@ if (!process.env.API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-export const generateGreetingAudio = async (): Promise<string> => {
+export const generateGreetingAudio = async (text: string, voiceName: string): Promise<string> => {
   try {
     const response = await ai.models.generateContent({
       model: TTS_MODEL_NAME,
-      contents: [{ parts: [{ text: GREETING_MESSAGE }] }],
+      contents: [{ parts: [{ text }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Kore' },
+            prebuiltVoiceConfig: { voiceName },
           },
         },
       },
@@ -40,7 +40,11 @@ interface LiveSessionCallbacks {
   onClose: (event: CloseEvent) => void;
 }
 
-export const connectToLiveSession = (callbacks: LiveSessionCallbacks) => {
+export const connectToLiveSession = (
+  callbacks: LiveSessionCallbacks,
+  systemInstruction: string,
+  voiceName: string
+) => {
   return ai.live.connect({
     model: LIVE_MODEL_NAME,
     callbacks: {
@@ -52,11 +56,11 @@ export const connectToLiveSession = (callbacks: LiveSessionCallbacks) => {
     config: {
       responseModalities: [Modality.AUDIO],
       speechConfig: {
-        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
+        voiceConfig: { prebuiltVoiceConfig: { voiceName } },
       },
       inputAudioTranscription: {},
       outputAudioTranscription: {},
-      systemInstruction: SYSTEM_INSTRUCTION,
+      systemInstruction: systemInstruction,
     },
   });
 };

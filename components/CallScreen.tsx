@@ -1,17 +1,18 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { CallStatus, TranscriptionEntry } from '../types';
+import { CallStatus, TranscriptionEntry, PersonaConfig } from '../types';
 import { connectToLiveSession, generateGreetingAudio } from '../services/geminiService';
 import { decode, encode, decodeAudioData } from '../utils/audioUtils';
-import { PhoneHangupIcon, MicIcon } from './Icons';
+import { PhoneHangupIcon } from './Icons';
 import StatusIndicator from './StatusIndicator';
-import { LiveServerMessage, Blob } from '@google/genai';
+import { LiveServerMessage, Blob as GenAIBlob } from '@google/genai';
 
 interface CallScreenProps {
   onEndCall: () => void;
+  config: PersonaConfig;
 }
 
-const CallScreen: React.FC<CallScreenProps> = ({ onEndCall }) => {
+const CallScreen: React.FC<CallScreenProps> = ({ onEndCall, config }) => {
   const [status, setStatus] = useState<CallStatus>(CallStatus.IDLE);
   const [transcription, setTranscription] = useState<TranscriptionEntry[]>([]);
   const [permissionError, setPermissionError] = useState<string | null>(null);
@@ -40,8 +41,13 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall }) => {
     const { base64, isGreeting } = audioQueueRef.current.shift()!;
     
     if (!outputAudioContextRef.current) {
-        // FIX: Add type assertion to handle vendor-prefixed webkitAudioContext for older browsers.
-        outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        try {
+            outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        } catch (e) {
+            console.error("Failed to create AudioContext", e);
+            setStatus(CallStatus.ERROR);
+            return;
+        }
     }
     const audioContext = outputAudioContextRef.current;
 
@@ -93,8 +99,8 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall }) => {
       if (message.serverContent?.turnComplete) {
           setTranscription(prev => [
               ...prev,
-              { speaker: 'user', text: currentInputTranscriptionRef.current },
-              { speaker: 'agent', text: currentOutputTranscriptionRef.current }
+              { speaker: 'user' as const, text: currentInputTranscriptionRef.current },
+              { speaker: 'agent' as const, text: currentOutputTranscriptionRef.current }
           ].filter(entry => entry.text.trim() !== ''));
           currentInputTranscriptionRef.current = '';
           currentOutputTranscriptionRef.current = '';
@@ -107,7 +113,6 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall }) => {
   const startMicrophone = useCallback(async () => {
     try {
       if(!inputAudioContextRef.current) {
-          // FIX: Add type assertion to handle vendor-prefixed webkitAudioContext for older browsers.
           inputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       }
       const context = inputAudioContextRef.current;
@@ -118,7 +123,8 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall }) => {
       
       scriptProcessorRef.current.onaudioprocess = (event) => {
         const inputData = event.inputBuffer.getChannelData(0);
-        const pcmBlob: Blob = {
+        // Using GenAIBlob type alias for clarity and to avoid conflict with DOM Blob
+        const pcmBlob: GenAIBlob = {
           data: encode(new Uint8Array(new Int16Array(inputData.map(x => x * 32768)).buffer)),
           mimeType: 'audio/pcm;rate=16000',
         };
@@ -140,29 +146,34 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall }) => {
 
   const connectToLiveApi = useCallback(() => {
     setStatus(CallStatus.CONNECTING);
-    sessionPromiseRef.current = connectToLiveSession({
-        onOpen: startMicrophone,
-        onMessage: handleMessage,
-        onError: (e) => {
-            console.error("Session error:", e);
-            setStatus(CallStatus.ERROR);
+    sessionPromiseRef.current = connectToLiveSession(
+        {
+            onOpen: startMicrophone,
+            onMessage: handleMessage,
+            onError: (e) => {
+                console.error("Session error:", e);
+                setStatus(CallStatus.ERROR);
+            },
+            onClose: () => {
+                setStatus(CallStatus.ENDED);
+            },
         },
-        onClose: () => {
-            setStatus(CallStatus.ENDED);
-        },
-    });
-  }, [startMicrophone, handleMessage]);
+        config.systemInstruction,
+        config.voice
+    );
+  }, [startMicrophone, handleMessage, config.systemInstruction, config.voice]);
 
   useEffect(() => {
     const startSequence = async () => {
         setStatus(CallStatus.GREETING);
         try {
-            const greetingAudio = await generateGreetingAudio();
+            const greetingAudio = await generateGreetingAudio(config.greeting, config.voice);
             audioQueueRef.current.push({ base64: greetingAudio, isGreeting: true });
             processAudioQueue();
         } catch (error) {
             console.error("Failed to start call sequence:", error);
-            setStatus(CallStatus.ERROR);
+            // Fallback: If TTS fails, just try connecting
+            connectToLiveApi();
         }
     };
     startSequence();
@@ -185,16 +196,17 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall }) => {
 
   return (
     <div className="flex flex-col h-full bg-gray-900">
-      <div className="p-6 text-center border-b border-gray-700">
-        <h2 className="text-xl font-semibold">AI Phone Agent</h2>
+      <div className="p-6 text-center border-b border-gray-700 bg-gray-800">
+        <h2 className="text-xl font-bold text-white mb-1">{config.name}</h2>
+        <p className="text-xs text-gray-400 mb-3">{config.description || 'Active Call'}</p>
         <StatusIndicator status={status} />
       </div>
 
-      <div className="flex-grow p-6 overflow-y-auto space-y-4">
+      <div className="flex-grow p-6 overflow-y-auto space-y-4 bg-gray-900 scrollbar-thin scrollbar-thumb-gray-700">
         {transcription.map((entry, index) => (
           <div key={index} className={`flex ${entry.speaker === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-xs md:max-w-sm lg:max-w-md p-3 rounded-2xl ${entry.speaker === 'user' ? 'bg-blue-600 rounded-br-none' : 'bg-gray-700 rounded-bl-none'}`}>
-              <p className="text-white">{entry.text}</p>
+            <div className={`max-w-[80%] p-3 rounded-2xl ${entry.speaker === 'user' ? 'bg-blue-600 rounded-br-none text-white' : 'bg-gray-700 rounded-bl-none text-gray-100'}`}>
+              <p className="text-sm md:text-base">{entry.text}</p>
             </div>
           </div>
         ))}
@@ -207,7 +219,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall }) => {
         )}
       </div>
 
-      <div className="p-6 flex justify-center items-center border-t border-gray-700">
+      <div className="p-6 flex justify-center items-center border-t border-gray-700 bg-gray-800">
         <button
           onClick={handleEndCall}
           className="group flex items-center justify-center w-20 h-20 bg-red-600 rounded-full hover:bg-red-700 transition-all duration-300 shadow-lg transform hover:scale-105"
