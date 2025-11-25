@@ -1,0 +1,7 @@
+{
+  "name": "AI Phone Agent",
+  "description": "An intelligent AI agent for automating phone calls for reservations, appointments, and inquiries, powered by Gemini.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
