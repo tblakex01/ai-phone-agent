@@ -50,7 +50,6 @@ describe('Audio Pipeline Integration', () => {
     });
 
     it('should handle stereo audio data', () => {
-      const sampleRate = 24000;
       const numChannels = 2;
       const framesPerChannel = 100;
 
@@ -303,7 +302,7 @@ describe('Audio Pipeline Integration', () => {
         })),
       };
 
-      const buffer = await decodeAudioData(
+      await decodeAudioData(
         bytes,
         mockContext as unknown as AudioContext,
         sampleRate,
@@ -328,7 +327,7 @@ describe('Audio Pipeline Integration', () => {
         })),
       };
 
-      const buffer = await decodeAudioData(
+      await decodeAudioData(
         bytes,
         mockContext as unknown as AudioContext,
         sampleRate,

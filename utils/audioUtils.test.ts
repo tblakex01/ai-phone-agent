@@ -147,7 +147,7 @@ describe('audioUtils', () => {
       const int16Data = new Int16Array([0, 1000, 2000, 3000, 4000, 5000]);
       const data = new Uint8Array(int16Data.buffer);
 
-      const buffer = await decodeAudioData(
+      await decodeAudioData(
         data,
         mockAudioContext as unknown as AudioContext,
         24000,
@@ -184,7 +184,7 @@ describe('audioUtils', () => {
     it('should handle empty audio data', async () => {
       const data = new Uint8Array(0);
 
-      const buffer = await decodeAudioData(
+      await decodeAudioData(
         data,
         mockAudioContext as unknown as AudioContext,
         24000,
