@@ -6,9 +6,12 @@ import { TextEncoder, TextDecoder } from 'util';
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder as typeof global.TextDecoder;
 
-// Mock process.env for tests
+// Mock process.env for tests in a minimally intrusive way
+const originalProcess = process;
 vi.stubGlobal('process', {
+  ...originalProcess,
   env: {
+    ...originalProcess.env,
     API_KEY: 'test-api-key',
     GEMINI_API_KEY: 'test-gemini-api-key',
   },
@@ -22,25 +25,23 @@ class MockAudioContext {
   destination = {};
 
   createBuffer(channels: number, length: number, sampleRate: number) {
-    const buffer = {
+    return {
       numberOfChannels: channels,
       length,
       sampleRate,
       duration: length / sampleRate,
       getChannelData: vi.fn(() => new Float32Array(length)),
     };
-    return buffer;
   }
 
   createBufferSource() {
-    const source = {
+    return {
       buffer: null as any,
       connect: vi.fn(),
       start: vi.fn(),
       stop: vi.fn(),
       onended: null as (() => void) | null,
     };
-    return source;
   }
 
   createMediaStreamSource() {
