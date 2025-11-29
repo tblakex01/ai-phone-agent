@@ -192,13 +192,17 @@ describe('Audio Pipeline Integration', () => {
   });
 
   describe('microphone input simulation', () => {
-    it('should correctly encode microphone Float32 input to PCM', () => {
+    it('should correctly encode microphone Float32 input to PCM with clamping', () => {
       // Simulate Float32 data from microphone (range -1.0 to 1.0)
       const microphoneData = new Float32Array([0, 0.5, 1.0, -0.5, -1.0]);
 
-      // Convert to Int16 (as done in the app)
+      // Convert to Int16 with clamping (as done in production - see CallScreen.tsx)
+      // Values are scaled by 32767 and clamped to [-32768, 32767] to prevent overflow
       const int16Data = new Int16Array(
-        microphoneData.map((x) => Math.round(x * 32768))
+        microphoneData.map((x) => {
+          const scaled = Math.round(x * 32767);
+          return Math.max(-32768, Math.min(32767, scaled));
+        })
       );
 
       // Convert to bytes and encode
@@ -212,26 +216,32 @@ describe('Audio Pipeline Integration', () => {
       const decoded = decode(base64);
       const reconstructedInt16 = new Int16Array(decoded.buffer);
 
-      // Check values (note: 1.0 * 32768 = 32768, which overflows to -32768 in Int16)
-      expect(reconstructedInt16[0]).toBe(0);
-      expect(reconstructedInt16[1]).toBe(16384);
-      expect(reconstructedInt16[3]).toBe(-16384);
+      // Check all values - clamping ensures no overflow at boundary values
+      // Note: Math.round(-16383.5) = -16383 in JS (rounds towards +∞ for .5)
+      expect(reconstructedInt16[0]).toBe(0);        // 0 * 32767 = 0
+      expect(reconstructedInt16[1]).toBe(16384);    // 0.5 * 32767 = 16383.5 → 16384
+      expect(reconstructedInt16[2]).toBe(32767);    // 1.0 * 32767 = 32767 (clamped to max)
+      expect(reconstructedInt16[3]).toBe(-16383);   // -0.5 * 32767 = -16383.5 → -16383
+      expect(reconstructedInt16[4]).toBe(-32767);   // -1.0 * 32767 = -32767
     });
 
     it('should handle clipping at maximum values', () => {
-      // Values that would overflow if not clamped
+      // Values outside normal range [-1.0, 1.0] that would overflow if not clamped
       const inputData = new Float32Array([1.5, -1.5, 2.0, -2.0]);
 
-      // In a real implementation, we should clamp values
+      // Production code clamps values to prevent overflow (see CallScreen.tsx)
+      // This matches the clamping logic used in actual microphone input processing
       const clampedInt16 = new Int16Array(
         inputData.map((x) => {
-          const scaled = x * 32767;
-          return Math.max(-32768, Math.min(32767, Math.round(scaled)));
+          const scaled = Math.round(x * 32767);
+          return Math.max(-32768, Math.min(32767, scaled));
         })
       );
 
-      expect(clampedInt16[0]).toBe(32767); // Clamped to max
-      expect(clampedInt16[1]).toBe(-32768); // Clamped to min
+      expect(clampedInt16[0]).toBe(32767);  // 1.5 * 32767 = 49151, clamped to 32767
+      expect(clampedInt16[1]).toBe(-32768); // -1.5 * 32767 = -49151, clamped to -32768
+      expect(clampedInt16[2]).toBe(32767);  // 2.0 * 32767 = 65534, clamped to 32767
+      expect(clampedInt16[3]).toBe(-32768); // -2.0 * 32767 = -65534, clamped to -32768
     });
   });
 
