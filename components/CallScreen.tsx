@@ -123,9 +123,15 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall, config }) => {
       
       scriptProcessorRef.current.onaudioprocess = (event) => {
         const inputData = event.inputBuffer.getChannelData(0);
+        // Allocate Int16Array directly and fill with a for-loop to avoid
+        // intermediate JS array allocation from .map() in real-time audio path
+        const pcmData = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          pcmData[i] = floatToPcmInt16(inputData[i]);
+        }
         // Using GenAIBlob type alias for clarity and to avoid conflict with DOM Blob
         const pcmBlob: GenAIBlob = {
-          data: encode(new Uint8Array(new Int16Array(inputData.map(floatToPcmInt16)).buffer)),
+          data: encode(new Uint8Array(pcmData.buffer)),
           mimeType: 'audio/pcm;rate=16000',
         };
         sessionPromiseRef.current?.then((session) => {

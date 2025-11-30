@@ -277,8 +277,10 @@ describe('audioUtils', () => {
       expect(pcmInt16ToFloat(INT16_MAX)).toBeCloseTo(1.0, 2);
     });
 
-    it('should convert INT16_MIN to -1.0', () => {
-      expect(pcmInt16ToFloat(INT16_MIN)).toBe(-1.0);
+    it('should convert INT16_MIN to approximately -1.0', () => {
+      // With PCM_SCALE = INT16_MAX (32767), INT16_MIN (-32768) converts to
+      // slightly less than -1.0. This is intentional for symmetric round-trip.
+      expect(pcmInt16ToFloat(INT16_MIN)).toBeCloseTo(-1.0, 4);
     });
 
     it('should convert 16384 to approximately 0.5', () => {
