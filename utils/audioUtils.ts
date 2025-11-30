@@ -1,3 +1,23 @@
+// PCM audio conversion constants
+export const INT16_MAX = 32767;
+export const INT16_MIN = -32768;
+export const PCM_SCALE = 32768.0;
+
+/**
+ * Converts a Float32 audio sample (-1.0 to 1.0) to Int16 PCM format.
+ * Applies scaling and clamping to prevent overflow.
+ */
+export function floatToPcmInt16(sample: number): number {
+  const scaled = Math.round(sample * INT16_MAX);
+  return Math.max(INT16_MIN, Math.min(INT16_MAX, scaled));
+}
+
+/**
+ * Converts an Int16 PCM sample to Float32 (-1.0 to 1.0).
+ */
+export function pcmInt16ToFloat(sample: number): number {
+  return sample / PCM_SCALE;
+}
 
 export function decode(base64: string): Uint8Array {
   const binaryString = atob(base64);
@@ -31,7 +51,7 @@ export async function decodeAudioData(
   for (let channel = 0; channel < numChannels; channel++) {
     const channelData = buffer.getChannelData(channel);
     for (let i = 0; i < frameCount; i++) {
-      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+      channelData[i] = pcmInt16ToFloat(dataInt16[i * numChannels + channel]);
     }
   }
   return buffer;

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CallStatus, TranscriptionEntry, PersonaConfig } from '../types';
 import { connectToLiveSession, generateGreetingAudio } from '../services/geminiService';
-import { decode, encode, decodeAudioData } from '../utils/audioUtils';
+import { decode, encode, decodeAudioData, floatToPcmInt16 } from '../utils/audioUtils';
 import { PhoneHangupIcon } from './Icons';
 import StatusIndicator from './StatusIndicator';
 import { LiveServerMessage, Blob as GenAIBlob } from '@google/genai';
@@ -125,10 +125,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall, config }) => {
         const inputData = event.inputBuffer.getChannelData(0);
         // Using GenAIBlob type alias for clarity and to avoid conflict with DOM Blob
         const pcmBlob: GenAIBlob = {
-          data: encode(new Uint8Array(new Int16Array(inputData.map(x => {
-            const scaled = Math.round(x * 32767);
-            return Math.max(-32768, Math.min(32767, scaled));
-          })).buffer)),
+          data: encode(new Uint8Array(new Int16Array(inputData.map(floatToPcmInt16)).buffer)),
           mimeType: 'audio/pcm;rate=16000',
         };
         sessionPromiseRef.current?.then((session) => {
