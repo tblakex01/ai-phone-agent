@@ -4,11 +4,11 @@
     "types": ["node", "vitest/globals"]
   },
   "include": [
-    "vitest.config.*",
-    "tests/**/*",
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "**/*.spec.ts",
-    "**/*.spec.tsx"
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
   ]
 }

@@ -106,11 +106,12 @@ vi.stubGlobal('ResizeObserver', class ResizeObserver {
 });
 
 // Mock requestAnimationFrame (needed for React)
+// Cast to number since browser setTimeout returns number, but Node.js returns Timeout
 global.requestAnimationFrame = vi.fn((callback) => {
-  return setTimeout(callback, 0);
+  return setTimeout(callback, 0) as unknown as number;
 });
 
-global.cancelAnimationFrame = vi.fn((id) => {
+global.cancelAnimationFrame = vi.fn((id: number) => {
   clearTimeout(id);
 });
 

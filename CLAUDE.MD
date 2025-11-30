@@ -92,7 +92,25 @@ Audio sample rates are in `CallScreen.tsx`: input at 16kHz, output at 24kHz.
 
 ## Testing
 
-No test framework currently configured. Manual testing via browser.
+```bash
+npm test           # Run tests in watch mode
+npm run test:run   # Run tests once
+npm run test:coverage  # Run tests with coverage report
+npm run typecheck      # Type check source files
+npm run typecheck:test # Type check source and test files
+```
+
+**Important**: If you encounter `vitest: not found` error, run `npm install` first to install dependencies before running tests.
+
+### Test Organization
+
+Tests follow the **co-located pattern** (industry best practice for React/TypeScript):
+
+- **Unit tests**: Located next to source files (e.g., `App.tsx` + `App.test.tsx`)
+- **`tests/setup.ts`**: Global test configuration, mocks, and polyfills
+- **`tests/integration/`**: Integration tests spanning multiple modules
+
+This structure ensures tests are discoverable alongside the code they test and move together during refactoring.
 
 ## Known Considerations
 

@@ -25,6 +25,12 @@ export default defineConfig({
         'vitest.config.ts',
         'index.tsx',
       ],
+      thresholds: {
+        statements: 85,
+        branches: 85,
+        functions: 85,
+        lines: 85,
+      },
     },
   },
   resolve: {
