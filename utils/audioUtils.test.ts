@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { decode, encode, decodeAudioData } from './audioUtils';
+import { decode, encode, decodeAudioData, floatToPcmInt16, pcmInt16ToFloat, INT16_MAX, INT16_MIN, PCM_SCALE } from './audioUtils';
 
 describe('audioUtils', () => {
   describe('encode', () => {
@@ -75,7 +75,7 @@ describe('audioUtils', () => {
 
     it('should correctly roundtrip audio-like data', () => {
       // Simulate PCM audio data (Int16 values)
-      const int16Data = new Int16Array([0, 1000, -1000, 32767, -32768]);
+      const int16Data = new Int16Array([0, 1000, -1000, INT16_MAX, INT16_MIN]);
       const bytes = new Uint8Array(int16Data.buffer);
       const encoded = encode(bytes);
       const decoded = decode(encoded);
@@ -128,7 +128,7 @@ describe('audioUtils', () => {
 
     it('should decode mono audio data', async () => {
       // Create Int16 audio samples
-      const int16Data = new Int16Array([0, 16384, 32767, -32768, -16384]);
+      const int16Data = new Int16Array([0, 16384, INT16_MAX, INT16_MIN, -16384]);
       const data = new Uint8Array(int16Data.buffer);
 
       const buffer = await decodeAudioData(
@@ -158,9 +158,9 @@ describe('audioUtils', () => {
     });
 
     it('should normalize Int16 values to Float32 range', async () => {
-      // Max positive: 32767 -> ~1.0
-      // Max negative: -32768 -> -1.0
-      const int16Data = new Int16Array([32767, -32768, 0]);
+      // Max positive: INT16_MAX -> ~1.0
+      // Max negative: INT16_MIN -> -1.0
+      const int16Data = new Int16Array([INT16_MAX, INT16_MIN, 0]);
       const data = new Uint8Array(int16Data.buffer);
 
       const capturedChannelData = new Float32Array(3);
@@ -176,8 +176,8 @@ describe('audioUtils', () => {
       );
 
       // Check normalization
-      expect(capturedChannelData[0]).toBeCloseTo(32767 / 32768.0, 4);
-      expect(capturedChannelData[1]).toBeCloseTo(-32768 / 32768.0, 4);
+      expect(capturedChannelData[0]).toBeCloseTo(INT16_MAX / PCM_SCALE, 4);
+      expect(capturedChannelData[1]).toBeCloseTo(INT16_MIN / PCM_SCALE, 4);
       expect(capturedChannelData[2]).toBe(0);
     });
 
@@ -237,6 +237,63 @@ describe('audioUtils', () => {
       const encoded = encode(bytes);
       const decoded = decode(encoded);
       expect(Array.from(decoded)).toEqual([0, 0, 0]);
+    });
+  });
+
+  describe('floatToPcmInt16', () => {
+    it('should convert 0.0 to 0', () => {
+      expect(floatToPcmInt16(0)).toBe(0);
+    });
+
+    it('should convert 1.0 to INT16_MAX', () => {
+      expect(floatToPcmInt16(1.0)).toBe(INT16_MAX);
+    });
+
+    it('should convert -1.0 to -INT16_MAX', () => {
+      expect(floatToPcmInt16(-1.0)).toBe(-INT16_MAX);
+    });
+
+    it('should convert 0.5 to approximately half of INT16_MAX', () => {
+      expect(floatToPcmInt16(0.5)).toBe(16384);
+    });
+
+    it('should clamp values greater than 1.0 to INT16_MAX', () => {
+      expect(floatToPcmInt16(1.5)).toBe(INT16_MAX);
+      expect(floatToPcmInt16(2.0)).toBe(INT16_MAX);
+    });
+
+    it('should clamp values less than -1.0 to INT16_MIN', () => {
+      expect(floatToPcmInt16(-1.5)).toBe(INT16_MIN);
+      expect(floatToPcmInt16(-2.0)).toBe(INT16_MIN);
+    });
+  });
+
+  describe('pcmInt16ToFloat', () => {
+    it('should convert 0 to 0.0', () => {
+      expect(pcmInt16ToFloat(0)).toBe(0);
+    });
+
+    it('should convert INT16_MAX to approximately 1.0', () => {
+      expect(pcmInt16ToFloat(INT16_MAX)).toBeCloseTo(1.0, 2);
+    });
+
+    it('should convert INT16_MIN to -1.0', () => {
+      expect(pcmInt16ToFloat(INT16_MIN)).toBe(-1.0);
+    });
+
+    it('should convert 16384 to approximately 0.5', () => {
+      expect(pcmInt16ToFloat(16384)).toBeCloseTo(0.5, 2);
+    });
+  });
+
+  describe('floatToPcmInt16 and pcmInt16ToFloat roundtrip', () => {
+    it('should approximately roundtrip standard values', () => {
+      const testValues = [0, 0.5, -0.5, 0.25, -0.25];
+      for (const value of testValues) {
+        const int16 = floatToPcmInt16(value);
+        const back = pcmInt16ToFloat(int16);
+        expect(back).toBeCloseTo(value, 2);
+      }
     });
   });
 });

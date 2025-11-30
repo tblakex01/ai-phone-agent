@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { encode, decode, decodeAudioData } from '../../utils/audioUtils';
+import { encode, decode, decodeAudioData, floatToPcmInt16, INT16_MAX, INT16_MIN, PCM_SCALE } from '../../utils/audioUtils';
 
 /**
  * Integration tests for the audio pipeline
@@ -84,11 +84,11 @@ describe('Audio Pipeline Integration', () => {
         100, // Quiet
         1000, // Medium
         16000, // Loud
-        32767, // Maximum positive
+        INT16_MAX, // Maximum positive
         -1, // Very quiet negative
         -100, // Quiet negative
         -16000, // Loud negative
-        -32768, // Maximum negative
+        INT16_MIN, // Maximum negative
       ]);
 
       const bytes = new Uint8Array(samples.buffer);
@@ -128,9 +128,9 @@ describe('Audio Pipeline Integration', () => {
       const int16Samples = new Int16Array([
         0, // Should become 0.0
         16384, // Should become ~0.5
-        32767, // Should become ~1.0
+        INT16_MAX, // Should become ~1.0
         -16384, // Should become ~-0.5
-        -32768, // Should become -1.0
+        INT16_MIN, // Should become -1.0
       ]);
 
       const bytes = new Uint8Array(int16Samples.buffer);
@@ -184,10 +184,10 @@ describe('Audio Pipeline Integration', () => {
       );
 
       // Verify the pipeline preserved the audio correctly
-      expect(capturedData[0]).toBeCloseTo(1000 / 32768.0, 4);
-      expect(capturedData[1]).toBeCloseTo(-1000 / 32768.0, 4);
-      expect(capturedData[2]).toBeCloseTo(2000 / 32768.0, 4);
-      expect(capturedData[3]).toBeCloseTo(-2000 / 32768.0, 4);
+      expect(capturedData[0]).toBeCloseTo(1000 / PCM_SCALE, 4);
+      expect(capturedData[1]).toBeCloseTo(-1000 / PCM_SCALE, 4);
+      expect(capturedData[2]).toBeCloseTo(2000 / PCM_SCALE, 4);
+      expect(capturedData[3]).toBeCloseTo(-2000 / PCM_SCALE, 4);
     });
   });
 
@@ -196,14 +196,8 @@ describe('Audio Pipeline Integration', () => {
       // Simulate Float32 data from microphone (range -1.0 to 1.0)
       const microphoneData = new Float32Array([0, 0.5, 1.0, -0.5, -1.0]);
 
-      // Convert to Int16 with clamping (as done in production - see CallScreen.tsx)
-      // Values are scaled by 32767 and clamped to [-32768, 32767] to prevent overflow
-      const int16Data = new Int16Array(
-        microphoneData.map((x) => {
-          const scaled = Math.round(x * 32767);
-          return Math.max(-32768, Math.min(32767, scaled));
-        })
-      );
+      // Convert to Int16 using the shared helper function (same as CallScreen.tsx)
+      const int16Data = new Int16Array(microphoneData.map(floatToPcmInt16));
 
       // Convert to bytes and encode
       const bytes = new Uint8Array(int16Data.buffer);
@@ -218,30 +212,24 @@ describe('Audio Pipeline Integration', () => {
 
       // Check all values - clamping ensures no overflow at boundary values
       // Note: Math.round(-16383.5) = -16383 in JS (rounds towards +∞ for .5)
-      expect(reconstructedInt16[0]).toBe(0);        // 0 * 32767 = 0
-      expect(reconstructedInt16[1]).toBe(16384);    // 0.5 * 32767 = 16383.5 → 16384
-      expect(reconstructedInt16[2]).toBe(32767);    // 1.0 * 32767 = 32767 (clamped to max)
-      expect(reconstructedInt16[3]).toBe(-16383);   // -0.5 * 32767 = -16383.5 → -16383
-      expect(reconstructedInt16[4]).toBe(-32767);   // -1.0 * 32767 = -32767
+      expect(reconstructedInt16[0]).toBe(0);           // 0 * INT16_MAX = 0
+      expect(reconstructedInt16[1]).toBe(16384);       // 0.5 * INT16_MAX = 16383.5 → 16384
+      expect(reconstructedInt16[2]).toBe(INT16_MAX);   // 1.0 * INT16_MAX = INT16_MAX (clamped to max)
+      expect(reconstructedInt16[3]).toBe(-16383);      // -0.5 * INT16_MAX = -16383.5 → -16383
+      expect(reconstructedInt16[4]).toBe(-INT16_MAX);  // -1.0 * INT16_MAX = -INT16_MAX
     });
 
     it('should handle clipping at maximum values', () => {
       // Values outside normal range [-1.0, 1.0] that would overflow if not clamped
       const inputData = new Float32Array([1.5, -1.5, 2.0, -2.0]);
 
-      // Production code clamps values to prevent overflow (see CallScreen.tsx)
-      // This matches the clamping logic used in actual microphone input processing
-      const clampedInt16 = new Int16Array(
-        inputData.map((x) => {
-          const scaled = Math.round(x * 32767);
-          return Math.max(-32768, Math.min(32767, scaled));
-        })
-      );
+      // Use the shared helper function (same as CallScreen.tsx)
+      const clampedInt16 = new Int16Array(inputData.map(floatToPcmInt16));
 
-      expect(clampedInt16[0]).toBe(32767);  // 1.5 * 32767 = 49151, clamped to 32767
-      expect(clampedInt16[1]).toBe(-32768); // -1.5 * 32767 = -49151, clamped to -32768
-      expect(clampedInt16[2]).toBe(32767);  // 2.0 * 32767 = 65534, clamped to 32767
-      expect(clampedInt16[3]).toBe(-32768); // -2.0 * 32767 = -65534, clamped to -32768
+      expect(clampedInt16[0]).toBe(INT16_MAX);  // 1.5 * INT16_MAX = 49151, clamped to INT16_MAX
+      expect(clampedInt16[1]).toBe(INT16_MIN);  // -1.5 * INT16_MAX = -49151, clamped to INT16_MIN
+      expect(clampedInt16[2]).toBe(INT16_MAX);  // 2.0 * INT16_MAX = 65534, clamped to INT16_MAX
+      expect(clampedInt16[3]).toBe(INT16_MIN);  // -2.0 * INT16_MAX = -65534, clamped to INT16_MIN
     });
   });
 
