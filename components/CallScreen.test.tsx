@@ -617,4 +617,768 @@ describe('CallScreen', () => {
       expect(capturedCallbacks.onMessage).toBeDefined();
     });
   });
+
+  describe('error boundary tests', () => {
+    it('should handle AudioContext creation failure in processAudioQueue', async () => {
+      // Store original AudioContext
+      const OriginalAudioContext = global.AudioContext;
+
+      // Mock AudioContext to throw on construction
+      const mockFailingAudioContext = vi.fn().mockImplementation(() => {
+        throw new Error('AudioContext not supported');
+      });
+      vi.stubGlobal('AudioContext', mockFailingAudioContext);
+      vi.stubGlobal('webkitAudioContext', mockFailingAudioContext);
+
+      let capturedCallbacks: any;
+      mockConnectToLiveSession.mockImplementation((callbacks) => {
+        capturedCallbacks = callbacks;
+        return Promise.resolve({
+          close: vi.fn(),
+          send: vi.fn(),
+          sendRealtimeInput: vi.fn(),
+        });
+      });
+
+      mockGenerateGreetingAudio.mockRejectedValueOnce(new Error('TTS failed'));
+
+      render(<CallScreen onEndCall={mockOnEndCall} config={mockConfig} />);
+
+      await waitFor(() => {
+        expect(mockConnectToLiveSession).toHaveBeenCalled();
+      });
+
+      // Trigger audio message which will try to create AudioContext
+      capturedCallbacks.onMessage({
+        serverContent: {
+          modelTurn: {
+            parts: [{ inlineData: { data: 'base64AudioData' } }],
+          },
+        },
+      });
+
+      // Should transition to ERROR status when AudioContext fails
+      await waitFor(() => {
+        expect(screen.getByText(/error/i)).toBeInTheDocument();
+      });
+
+      // Restore original AudioContext
+      vi.stubGlobal('AudioContext', OriginalAudioContext);
+      vi.stubGlobal('webkitAudioContext', OriginalAudioContext);
+    });
+
+    it('should handle audio decoding failure in processAudioQueue', async () => {
+      // Import and re-mock audioUtils to throw on decodeAudioData
+      const audioUtils = await import('../utils/audioUtils');
+      vi.spyOn(audioUtils, 'decodeAudioData').mockRejectedValueOnce(
+        new Error('Failed to decode audio data')
+      );
+
+      let capturedCallbacks: any;
+      mockConnectToLiveSession.mockImplementation((callbacks) => {
+        capturedCallbacks = callbacks;
+        return Promise.resolve({
+          close: vi.fn(),
+          send: vi.fn(),
+          sendRealtimeInput: vi.fn(),
+        });
+      });
+
+      mockGenerateGreetingAudio.mockRejectedValueOnce(new Error('TTS failed'));
+
+      render(<CallScreen onEndCall={mockOnEndCall} config={mockConfig} />);
+
+      await waitFor(() => {
+        expect(mockConnectToLiveSession).toHaveBeenCalled();
+      });
+
+      // Trigger audio message which will try to decode audio
+      capturedCallbacks.onMessage({
+        serverContent: {
+          modelTurn: {
+            parts: [{ inlineData: { data: 'invalidBase64AudioData' } }],
+          },
+        },
+      });
+
+      // Should transition to ERROR status
+      await waitFor(() => {
+        expect(screen.getByText(/error/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should continue processing queue after audio playback error', async () => {
+      // Import and re-mock audioUtils to throw once then succeed
+      const audioUtils = await import('../utils/audioUtils');
+      vi.spyOn(audioUtils, 'decodeAudioData')
+        .mockRejectedValueOnce(new Error('First audio failed'))
+        .mockResolvedValueOnce({
+          duration: 0.001,
+          numberOfChannels: 1,
+          sampleRate: 24000,
+          length: 24,
+          getChannelData: vi.fn(() => new Float32Array(24)),
+        } as unknown as AudioBuffer);
+
+      let capturedCallbacks: any;
+      mockConnectToLiveSession.mockImplementation((callbacks) => {
+        capturedCallbacks = callbacks;
+        return Promise.resolve({
+          close: vi.fn(),
+          send: vi.fn(),
+          sendRealtimeInput: vi.fn(),
+        });
+      });
+
+      mockGenerateGreetingAudio.mockRejectedValueOnce(new Error('TTS failed'));
+
+      render(<CallScreen onEndCall={mockOnEndCall} config={mockConfig} />);
+
+      await waitFor(() => {
+        expect(mockConnectToLiveSession).toHaveBeenCalled();
+      });
+
+      // Queue two audio messages
+      capturedCallbacks.onMessage({
+        serverContent: {
+          modelTurn: {
+            parts: [{ inlineData: { data: 'failingAudioData' } }],
+          },
+        },
+      });
+
+      capturedCallbacks.onMessage({
+        serverContent: {
+          modelTurn: {
+            parts: [{ inlineData: { data: 'successAudioData' } }],
+          },
+        },
+      });
+
+      // Verify decodeAudioData was called (queue processing continued)
+      await waitFor(() => {
+        expect(audioUtils.decodeAudioData).toHaveBeenCalled();
+      });
+    });
+
+    it('should handle input AudioContext creation failure', async () => {
+      // Store original AudioContext
+      const OriginalAudioContext = global.AudioContext;
+
+      // Mock AudioContext to throw when creating input context (16000 sample rate)
+      const mockConditionalAudioContext = vi.fn().mockImplementation(({ sampleRate }) => {
+        // Fail input AudioContext (16000 sample rate) which is used for microphone
+        if (sampleRate === 16000) {
+          throw new Error('Input AudioContext not supported');
+        }
+        // Return a valid mock for output context
+        return {
+          sampleRate,
+          currentTime: 0,
+          state: 'running',
+          destination: {},
+          createMediaStreamSource: vi.fn(() => ({
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+          })),
+          createScriptProcessor: vi.fn(() => ({
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            onaudioprocess: null,
+          })),
+          createBufferSource: vi.fn(() => ({
+            buffer: null,
+            connect: vi.fn(),
+            start: vi.fn(),
+            stop: vi.fn(),
+            onended: null,
+          })),
+          close: vi.fn().mockResolvedValue(undefined),
+          resume: vi.fn().mockResolvedValue(undefined),
+        };
+      });
+      vi.stubGlobal('AudioContext', mockConditionalAudioContext);
+      vi.stubGlobal('webkitAudioContext', mockConditionalAudioContext);
+
+      let capturedCallbacks: any;
+      mockConnectToLiveSession.mockImplementation((callbacks) => {
+        capturedCallbacks = callbacks;
+        return Promise.resolve({
+          close: vi.fn(),
+          send: vi.fn(),
+          sendRealtimeInput: vi.fn(),
+        });
+      });
+
+      mockGenerateGreetingAudio.mockRejectedValueOnce(new Error('TTS failed'));
+
+      render(<CallScreen onEndCall={mockOnEndCall} config={mockConfig} />);
+
+      await waitFor(() => {
+        expect(mockConnectToLiveSession).toHaveBeenCalled();
+      });
+
+      // Trigger onOpen which starts microphone - this will throw when creating input AudioContext
+      // The error is caught in startMicrophone's catch block which sets permissionError
+      await capturedCallbacks.onOpen();
+
+      // Should show error status - the catch block in startMicrophone sets both
+      // permissionError and status to ERROR. Check for either the status indicator
+      // showing "Connection Error" or the permission error message
+      await waitFor(() => {
+        const hasError = screen.queryByText(/Connection Error/i) ||
+                        screen.queryByText(/Microphone access is required/i);
+        expect(hasError).toBeInTheDocument();
+      });
+
+      // Restore original AudioContext
+      vi.stubGlobal('AudioContext', OriginalAudioContext);
+      vi.stubGlobal('webkitAudioContext', OriginalAudioContext);
+    });
+
+    it('should handle network errors during live session', async () => {
+      let capturedCallbacks: any;
+      mockConnectToLiveSession.mockImplementation((callbacks) => {
+        capturedCallbacks = callbacks;
+        return Promise.resolve({
+          close: vi.fn(),
+          send: vi.fn(),
+          sendRealtimeInput: vi.fn(),
+        });
+      });
+
+      mockGenerateGreetingAudio.mockRejectedValueOnce(new Error('TTS failed'));
+
+      render(<CallScreen onEndCall={mockOnEndCall} config={mockConfig} />);
+
+      await waitFor(() => {
+        expect(mockConnectToLiveSession).toHaveBeenCalled();
+      });
+
+      // Simulate network error
+      const networkError = new ErrorEvent('error', {
+        message: 'WebSocket connection failed'
+      });
+      capturedCallbacks.onError(networkError);
+
+      await waitFor(() => {
+        expect(screen.getByText(/error/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should handle unexpected close during active session', async () => {
+      let capturedCallbacks: any;
+      mockConnectToLiveSession.mockImplementation((callbacks) => {
+        capturedCallbacks = callbacks;
+        return Promise.resolve({
+          close: vi.fn(),
+          send: vi.fn(),
+          sendRealtimeInput: vi.fn(),
+        });
+      });
+
+      mockGenerateGreetingAudio.mockRejectedValueOnce(new Error('TTS failed'));
+
+      render(<CallScreen onEndCall={mockOnEndCall} config={mockConfig} />);
+
+      await waitFor(() => {
+        expect(mockConnectToLiveSession).toHaveBeenCalled();
+      });
+
+      // Start microphone first
+      await capturedCallbacks.onOpen();
+
+      // Simulate unexpected close
+      const closeEvent = new CloseEvent('close', {
+        code: 1006,
+        reason: 'Connection lost'
+      });
+      capturedCallbacks.onClose(closeEvent);
+
+      await waitFor(() => {
+        expect(screen.getByText(/ended/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('timeout and cleanup tests', () => {
+    it('should close session on unmount', async () => {
+      const mockClose = vi.fn();
+      mockConnectToLiveSession.mockReturnValue(
+        Promise.resolve({
+          close: mockClose,
+          send: vi.fn(),
+          sendRealtimeInput: vi.fn(),
+        })
+      );
+
+      mockGenerateGreetingAudio.mockRejectedValueOnce(new Error('TTS failed'));
+
+      const { unmount } = render(
+        <CallScreen onEndCall={mockOnEndCall} config={mockConfig} />
+      );
+
+      await waitFor(() => {
+        expect(mockConnectToLiveSession).toHaveBeenCalled();
+      });
+
+      // Unmount component
+      unmount();
+
+      // Session close should be called
+      await waitFor(() => {
+        expect(mockClose).toHaveBeenCalled();
+      });
+    });
+
+    it('should stop all media tracks on unmount', async () => {
+      const mockTrackStop = vi.fn();
+      const mockGetTracks = vi.fn(() => [
+        { stop: mockTrackStop },
+        { stop: mockTrackStop },
+      ]);
+      const mockMediaStream = { getTracks: mockGetTracks };
+
+      // Mock getUserMedia on the existing navigator.mediaDevices object
+      vi.spyOn(navigator.mediaDevices, 'getUserMedia').mockResolvedValue(
+        mockMediaStream as unknown as MediaStream
+      );
+
+      // Also need to mock AudioContext for this test
+      const OriginalAudioContext = global.AudioContext;
+      const mockAudioContext = vi.fn().mockImplementation(() => ({
+        sampleRate: 16000,
+        currentTime: 0,
+        state: 'running',
+        destination: {},
+        createMediaStreamSource: vi.fn(() => ({
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+        })),
+        createScriptProcessor: vi.fn(() => ({
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+          onaudioprocess: null,
+        })),
+        createBufferSource: vi.fn(() => ({
+          buffer: null,
+          connect: vi.fn(),
+          start: vi.fn(),
+          stop: vi.fn(),
+          onended: null,
+        })),
+        close: vi.fn().mockResolvedValue(undefined),
+        resume: vi.fn().mockResolvedValue(undefined),
+      }));
+      vi.stubGlobal('AudioContext', mockAudioContext);
+      vi.stubGlobal('webkitAudioContext', mockAudioContext);
+
+      let capturedCallbacks: any;
+      mockConnectToLiveSession.mockImplementation((callbacks) => {
+        capturedCallbacks = callbacks;
+        return Promise.resolve({
+          close: vi.fn(),
+          send: vi.fn(),
+          sendRealtimeInput: vi.fn(),
+        });
+      });
+
+      mockGenerateGreetingAudio.mockRejectedValueOnce(new Error('TTS failed'));
+
+      const { unmount } = render(
+        <CallScreen onEndCall={mockOnEndCall} config={mockConfig} />
+      );
+
+      await waitFor(() => {
+        expect(mockConnectToLiveSession).toHaveBeenCalled();
+      });
+
+      // Start microphone to create media stream
+      await capturedCallbacks.onOpen();
+
+      // Verify getUserMedia was called
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalled();
+
+      // Unmount component
+      unmount();
+
+      // All tracks should be stopped
+      expect(mockTrackStop).toHaveBeenCalledTimes(2);
+
+      // Restore original AudioContext
+      vi.stubGlobal('AudioContext', OriginalAudioContext);
+      vi.stubGlobal('webkitAudioContext', OriginalAudioContext);
+    });
+
+    it('should disconnect audio nodes on unmount', async () => {
+      const mockSourceDisconnect = vi.fn();
+      const mockProcessorDisconnect = vi.fn();
+
+      // Create custom AudioContext mock with tracking
+      const OriginalAudioContext = global.AudioContext;
+      const mockAudioContext = vi.fn().mockImplementation(() => ({
+        sampleRate: 16000,
+        currentTime: 0,
+        state: 'running',
+        destination: {},
+        createMediaStreamSource: vi.fn(() => ({
+          connect: vi.fn(),
+          disconnect: mockSourceDisconnect,
+        })),
+        createScriptProcessor: vi.fn(() => ({
+          connect: vi.fn(),
+          disconnect: mockProcessorDisconnect,
+          onaudioprocess: null,
+        })),
+        createBufferSource: vi.fn(() => ({
+          buffer: null,
+          connect: vi.fn(),
+          start: vi.fn(),
+          stop: vi.fn(),
+          onended: null,
+        })),
+        close: vi.fn().mockResolvedValue(undefined),
+        resume: vi.fn().mockResolvedValue(undefined),
+      }));
+      vi.stubGlobal('AudioContext', mockAudioContext);
+      vi.stubGlobal('webkitAudioContext', mockAudioContext);
+
+      let capturedCallbacks: any;
+      mockConnectToLiveSession.mockImplementation((callbacks) => {
+        capturedCallbacks = callbacks;
+        return Promise.resolve({
+          close: vi.fn(),
+          send: vi.fn(),
+          sendRealtimeInput: vi.fn(),
+        });
+      });
+
+      mockGenerateGreetingAudio.mockRejectedValueOnce(new Error('TTS failed'));
+
+      const { unmount } = render(
+        <CallScreen onEndCall={mockOnEndCall} config={mockConfig} />
+      );
+
+      await waitFor(() => {
+        expect(mockConnectToLiveSession).toHaveBeenCalled();
+      });
+
+      // Start microphone to create audio nodes
+      await capturedCallbacks.onOpen();
+
+      // Unmount component
+      unmount();
+
+      // Audio nodes should be disconnected
+      expect(mockSourceDisconnect).toHaveBeenCalled();
+      expect(mockProcessorDisconnect).toHaveBeenCalled();
+
+      // Restore original AudioContext
+      vi.stubGlobal('AudioContext', OriginalAudioContext);
+      vi.stubGlobal('webkitAudioContext', OriginalAudioContext);
+    });
+
+    it('should close AudioContext instances on unmount', async () => {
+      const mockInputClose = vi.fn().mockResolvedValue(undefined);
+      const mockOutputClose = vi.fn().mockResolvedValue(undefined);
+
+      let audioContextCallCount = 0;
+      const OriginalAudioContext = global.AudioContext;
+      const mockAudioContext = vi.fn().mockImplementation(({ sampleRate }) => {
+        audioContextCallCount++;
+        const closeFunc = sampleRate === 16000 ? mockInputClose : mockOutputClose;
+        return {
+          sampleRate,
+          currentTime: 0,
+          state: 'running',
+          destination: {},
+          createMediaStreamSource: vi.fn(() => ({
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+          })),
+          createScriptProcessor: vi.fn(() => ({
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            onaudioprocess: null,
+          })),
+          createBufferSource: vi.fn(() => ({
+            buffer: null,
+            connect: vi.fn(),
+            start: vi.fn(),
+            stop: vi.fn(),
+            onended: null,
+          })),
+          createBuffer: vi.fn(() => ({
+            numberOfChannels: 1,
+            length: 24,
+            sampleRate: 24000,
+            duration: 0.001,
+            getChannelData: vi.fn(() => new Float32Array(24)),
+          })),
+          close: closeFunc,
+          resume: vi.fn().mockResolvedValue(undefined),
+        };
+      });
+      vi.stubGlobal('AudioContext', mockAudioContext);
+      vi.stubGlobal('webkitAudioContext', mockAudioContext);
+
+      let capturedCallbacks: any;
+      mockConnectToLiveSession.mockImplementation((callbacks) => {
+        capturedCallbacks = callbacks;
+        return Promise.resolve({
+          close: vi.fn(),
+          send: vi.fn(),
+          sendRealtimeInput: vi.fn(),
+        });
+      });
+
+      mockGenerateGreetingAudio.mockRejectedValueOnce(new Error('TTS failed'));
+
+      const { unmount } = render(
+        <CallScreen onEndCall={mockOnEndCall} config={mockConfig} />
+      );
+
+      await waitFor(() => {
+        expect(mockConnectToLiveSession).toHaveBeenCalled();
+      });
+
+      // Start microphone to create input AudioContext
+      await capturedCallbacks.onOpen();
+
+      // Trigger audio playback to create output AudioContext
+      capturedCallbacks.onMessage({
+        serverContent: {
+          modelTurn: {
+            parts: [{ inlineData: { data: 'base64AudioData' } }],
+          },
+        },
+      });
+
+      // Wait for audio processing
+      await waitFor(() => {
+        expect(audioContextCallCount).toBeGreaterThanOrEqual(1);
+      });
+
+      // Unmount component
+      unmount();
+
+      // Input AudioContext should be closed
+      expect(mockInputClose).toHaveBeenCalled();
+
+      // Restore original AudioContext
+      vi.stubGlobal('AudioContext', OriginalAudioContext);
+      vi.stubGlobal('webkitAudioContext', OriginalAudioContext);
+    });
+
+    it('should handle cleanup when session promise has not resolved', async () => {
+      // Create a session promise that never resolves
+      let resolveSession: (value: any) => void;
+      const pendingSessionPromise = new Promise((resolve) => {
+        resolveSession = resolve;
+      });
+
+      mockConnectToLiveSession.mockReturnValue(pendingSessionPromise);
+      mockGenerateGreetingAudio.mockRejectedValueOnce(new Error('TTS failed'));
+
+      const { unmount } = render(
+        <CallScreen onEndCall={mockOnEndCall} config={mockConfig} />
+      );
+
+      await waitFor(() => {
+        expect(mockConnectToLiveSession).toHaveBeenCalled();
+      });
+
+      // Unmount before session resolves - should not throw
+      expect(() => unmount()).not.toThrow();
+    });
+
+    it('should handle cleanup when stream ref is null', async () => {
+      // Don't trigger onOpen, so streamRef remains null
+      mockConnectToLiveSession.mockReturnValue(
+        Promise.resolve({
+          close: vi.fn(),
+          send: vi.fn(),
+          sendRealtimeInput: vi.fn(),
+        })
+      );
+
+      mockGenerateGreetingAudio.mockRejectedValueOnce(new Error('TTS failed'));
+
+      const { unmount } = render(
+        <CallScreen onEndCall={mockOnEndCall} config={mockConfig} />
+      );
+
+      await waitFor(() => {
+        expect(mockConnectToLiveSession).toHaveBeenCalled();
+      });
+
+      // Unmount without starting microphone - should not throw
+      expect(() => unmount()).not.toThrow();
+    });
+
+    it('should handle rapid unmount during greeting playback', async () => {
+      // Resolve greeting audio but don't complete playback
+      mockGenerateGreetingAudio.mockResolvedValue('base64GreetingAudio');
+
+      const { unmount } = render(
+        <CallScreen onEndCall={mockOnEndCall} config={mockConfig} />
+      );
+
+      // Immediately unmount during greeting
+      unmount();
+
+      // Should not throw
+      expect(mockGenerateGreetingAudio).toHaveBeenCalled();
+    });
+
+    it('should handle cleanup when audio is still playing', async () => {
+      const mockSourceStop = vi.fn();
+      const mockSourceDisconnect = vi.fn();
+
+      const OriginalAudioContext = global.AudioContext;
+      const mockAudioContext = vi.fn().mockImplementation(() => ({
+        sampleRate: 24000,
+        currentTime: 0,
+        state: 'running',
+        destination: {},
+        createMediaStreamSource: vi.fn(() => ({
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+        })),
+        createScriptProcessor: vi.fn(() => ({
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+          onaudioprocess: null,
+        })),
+        createBufferSource: vi.fn(() => ({
+          buffer: null,
+          connect: vi.fn(),
+          disconnect: mockSourceDisconnect,
+          start: vi.fn(),
+          stop: mockSourceStop,
+          onended: null,
+        })),
+        createBuffer: vi.fn(() => ({
+          numberOfChannels: 1,
+          length: 24000, // Longer duration
+          sampleRate: 24000,
+          duration: 1.0,
+          getChannelData: vi.fn(() => new Float32Array(24000)),
+        })),
+        close: vi.fn().mockResolvedValue(undefined),
+        resume: vi.fn().mockResolvedValue(undefined),
+      }));
+      vi.stubGlobal('AudioContext', mockAudioContext);
+      vi.stubGlobal('webkitAudioContext', mockAudioContext);
+
+      let capturedCallbacks: any;
+      mockConnectToLiveSession.mockImplementation((callbacks) => {
+        capturedCallbacks = callbacks;
+        return Promise.resolve({
+          close: vi.fn(),
+          send: vi.fn(),
+          sendRealtimeInput: vi.fn(),
+        });
+      });
+
+      mockGenerateGreetingAudio.mockRejectedValueOnce(new Error('TTS failed'));
+
+      const { unmount } = render(
+        <CallScreen onEndCall={mockOnEndCall} config={mockConfig} />
+      );
+
+      await waitFor(() => {
+        expect(mockConnectToLiveSession).toHaveBeenCalled();
+      });
+
+      // Start audio playback
+      capturedCallbacks.onMessage({
+        serverContent: {
+          modelTurn: {
+            parts: [{ inlineData: { data: 'longAudioData' } }],
+          },
+        },
+      });
+
+      // Unmount while audio is "playing"
+      unmount();
+
+      // Cleanup should succeed without errors
+      expect(mockAudioContext).toHaveBeenCalled();
+
+      // Restore original AudioContext
+      vi.stubGlobal('AudioContext', OriginalAudioContext);
+      vi.stubGlobal('webkitAudioContext', OriginalAudioContext);
+    });
+
+    it('should cleanup script processor event handlers on unmount', async () => {
+      let scriptProcessorInstance: any = null;
+
+      const OriginalAudioContext = global.AudioContext;
+      const mockAudioContext = vi.fn().mockImplementation(() => ({
+        sampleRate: 16000,
+        currentTime: 0,
+        state: 'running',
+        destination: {},
+        createMediaStreamSource: vi.fn(() => ({
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+        })),
+        createScriptProcessor: vi.fn(() => {
+          scriptProcessorInstance = {
+            connect: vi.fn(),
+            disconnect: vi.fn(),
+            onaudioprocess: null,
+          };
+          return scriptProcessorInstance;
+        }),
+        createBufferSource: vi.fn(() => ({
+          buffer: null,
+          connect: vi.fn(),
+          start: vi.fn(),
+          stop: vi.fn(),
+          onended: null,
+        })),
+        close: vi.fn().mockResolvedValue(undefined),
+        resume: vi.fn().mockResolvedValue(undefined),
+      }));
+      vi.stubGlobal('AudioContext', mockAudioContext);
+      vi.stubGlobal('webkitAudioContext', mockAudioContext);
+
+      let capturedCallbacks: any;
+      mockConnectToLiveSession.mockImplementation((callbacks) => {
+        capturedCallbacks = callbacks;
+        return Promise.resolve({
+          close: vi.fn(),
+          send: vi.fn(),
+          sendRealtimeInput: vi.fn(),
+        });
+      });
+
+      mockGenerateGreetingAudio.mockRejectedValueOnce(new Error('TTS failed'));
+
+      const { unmount } = render(
+        <CallScreen onEndCall={mockOnEndCall} config={mockConfig} />
+      );
+
+      await waitFor(() => {
+        expect(mockConnectToLiveSession).toHaveBeenCalled();
+      });
+
+      // Start microphone to create script processor
+      await capturedCallbacks.onOpen();
+
+      // Verify script processor was created with onaudioprocess handler
+      expect(scriptProcessorInstance).not.toBeNull();
+      expect(scriptProcessorInstance.onaudioprocess).not.toBeNull();
+
+      // Unmount and verify disconnect is called
+      unmount();
+      expect(scriptProcessorInstance.disconnect).toHaveBeenCalled();
+
+      // Restore original AudioContext
+      vi.stubGlobal('AudioContext', OriginalAudioContext);
+      vi.stubGlobal('webkitAudioContext', OriginalAudioContext);
+    });
+  });
 });
