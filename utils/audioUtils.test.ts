@@ -222,6 +222,45 @@ describe('audioUtils', () => {
 
       expect(mockAudioContext.createBuffer).toHaveBeenCalledWith(2, 4, 48000);
     });
+
+    it('should correctly decode when Uint8Array is a subarray/view of a larger buffer', async () => {
+      // Create a larger buffer with padding data on both sides
+      const paddingBefore = new Uint8Array([0xFF, 0xFF, 0xFF, 0xFF]); // 4 bytes padding
+      const int16Data = new Int16Array([1000, -1000, 2000]); // 3 samples = 6 bytes
+      const paddingAfter = new Uint8Array([0xAA, 0xAA, 0xAA, 0xAA]); // 4 bytes padding
+
+      // Combine into a single larger buffer
+      const fullBuffer = new Uint8Array(paddingBefore.length + int16Data.byteLength + paddingAfter.length);
+      fullBuffer.set(paddingBefore, 0);
+      fullBuffer.set(new Uint8Array(int16Data.buffer), paddingBefore.length);
+      fullBuffer.set(paddingAfter, paddingBefore.length + int16Data.byteLength);
+
+      // Create a subarray view that only points to the int16 data portion
+      const subarray = fullBuffer.subarray(paddingBefore.length, paddingBefore.length + int16Data.byteLength);
+
+      // Verify it's actually a view into the larger buffer
+      expect(subarray.buffer.byteLength).toBe(fullBuffer.byteLength);
+      expect(subarray.byteOffset).toBe(paddingBefore.length);
+      expect(subarray.byteLength).toBe(int16Data.byteLength);
+
+      const capturedChannelData = new Float32Array(3);
+      mockAudioContext.createBuffer = vi.fn(() => ({
+        getChannelData: vi.fn(() => capturedChannelData),
+      }));
+
+      await decodeAudioData(
+        subarray,
+        mockAudioContext as unknown as AudioContext,
+        24000,
+        1
+      );
+
+      // Should decode only the subarray portion, not the padding
+      expect(mockAudioContext.createBuffer).toHaveBeenCalledWith(1, 3, 24000);
+      expect(capturedChannelData[0]).toBeCloseTo(1000 / PCM_SCALE, 4);
+      expect(capturedChannelData[1]).toBeCloseTo(-1000 / PCM_SCALE, 4);
+      expect(capturedChannelData[2]).toBeCloseTo(2000 / PCM_SCALE, 4);
+    });
   });
 
   describe('edge cases', () => {
