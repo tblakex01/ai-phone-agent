@@ -85,8 +85,12 @@ export async function decodeAudioData(
   if (data.byteOffset % 2 === 0) {
     dataInt16 = new Int16Array(data.buffer, data.byteOffset, data.byteLength / 2);
   } else {
-    // Copy to a new buffer to ensure alignment
-    const alignedBuffer = data.slice().buffer;
+    // Copy to a new buffer to ensure alignment using ArrayBuffer.slice directly
+    // to avoid an intermediate Uint8Array allocation
+    const alignedBuffer = data.buffer.slice(
+      data.byteOffset,
+      data.byteOffset + data.byteLength,
+    );
     dataInt16 = new Int16Array(alignedBuffer);
   }
   const frameCount = dataInt16.length / numChannels;
