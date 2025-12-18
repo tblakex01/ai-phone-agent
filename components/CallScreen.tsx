@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CallStatus, TranscriptionEntry, PersonaConfig } from '../types';
 import { connectToLiveSession, generateGreetingAudio } from '../services/geminiService';
 import { decode, encode, decodeAudioData, floatToPcmInt16 } from '../utils/audioUtils';
+import { logger } from '../utils/logger';
 import { PhoneHangupIcon } from './Icons';
 import StatusIndicator from './StatusIndicator';
 import { LiveServerMessage, Blob as GenAIBlob } from '@google/genai';
@@ -44,7 +45,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall, config }) => {
         try {
             outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
         } catch (e) {
-            console.error("Failed to create AudioContext", e);
+            logger.error("Failed to create AudioContext", e);
             setStatus(CallStatus.ERROR);
             return;
         }
@@ -70,7 +71,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall, config }) => {
         };
 
     } catch (error) {
-        console.error("Error playing audio:", error);
+        logger.error("Error playing audio:", error);
         setStatus(CallStatus.ERROR);
         isPlayingAudioRef.current = false;
         processAudioQueue(); // Try next in queue
@@ -144,7 +145,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall, config }) => {
       setStatus(CallStatus.LISTENING);
 
     } catch (err) {
-      console.error("Microphone access denied:", err);
+      logger.error("Microphone access denied:", err);
       setPermissionError("Microphone access is required. Please enable it in your browser settings and restart the call.");
       setStatus(CallStatus.ERROR);
     }
@@ -157,7 +158,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall, config }) => {
             onOpen: startMicrophone,
             onMessage: handleMessage,
             onError: (e) => {
-                console.error("Session error:", e);
+                logger.error("Session error:", e);
                 setStatus(CallStatus.ERROR);
             },
             onClose: () => {
@@ -177,7 +178,7 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall, config }) => {
             audioQueueRef.current.push({ base64: greetingAudio, isGreeting: true });
             processAudioQueue();
         } catch (error) {
-            console.error("Failed to start call sequence:", error);
+            logger.error("Failed to start call sequence:", error);
             // Fallback: If TTS fails, just try connecting
             connectToLiveApi();
         }

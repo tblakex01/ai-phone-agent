@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Modality, LiveServerMessage } from "@google/genai";
 import { LIVE_MODEL_NAME, TTS_MODEL_NAME } from '../constants';
+import { logger } from "../utils/logger";
 
 if (!process.env.API_KEY) {
   throw new Error("API_KEY environment variable not set");
@@ -28,7 +29,7 @@ export const generateGreetingAudio = async (text: string, voiceName: string): Pr
     }
     throw new Error("No audio data received from TTS API.");
   } catch (error) {
-    console.error("Error generating greeting audio:", error);
+    logger.error("Error generating greeting audio:", error);
     throw error;
   }
 };
