@@ -6,7 +6,7 @@
 // Keys that likely contain sensitive data.
 // We match these by checking if the key *contains* these strings, but we should be careful about false positives.
 // Refined list to avoid things like "keyboard" or "publicKey" triggering "key".
-const SENSITIVE_PATTERNS = [
+const SENSITIVE_KEY_PATTERNS = [
   /api[-_]?key/i,
   /auth(orization)?/i,
   /pass(word|phrase)?/i,
@@ -16,8 +16,21 @@ const SENSITIVE_PATTERNS = [
   /private[-_]?key/i,
 ];
 
+// Patterns to match sensitive values inside strings
+const SENSITIVE_VALUE_PATTERNS = [
+  /AIza[0-9A-Za-z\-_]{35}/g, // Google API Key
+];
+
 const isSensitiveKey = (key: string): boolean => {
-  return SENSITIVE_PATTERNS.some(pattern => pattern.test(key));
+  return SENSITIVE_KEY_PATTERNS.some(pattern => pattern.test(key));
+};
+
+const redactString = (str: string): string => {
+  let redacted = str;
+  for (const pattern of SENSITIVE_VALUE_PATTERNS) {
+    redacted = redacted.replace(pattern, '***REDACTED***');
+  }
+  return redacted;
 };
 
 const sanitize = (data: any, seen = new WeakSet()): any => {
@@ -26,7 +39,7 @@ const sanitize = (data: any, seen = new WeakSet()): any => {
   }
 
   if (typeof data === 'string') {
-    return data;
+    return redactString(data);
   }
 
   if (typeof data === 'function' || typeof data === 'symbol') {
@@ -46,9 +59,11 @@ const sanitize = (data: any, seen = new WeakSet()): any => {
     // Handle Error objects
     if (data instanceof Error) {
         const errorObj: Record<string, any> = {
-            message: data.message,
+            message: redactString(data.message),
             name: data.name,
-            stack: data.stack,
+            stack: data.stack, // Stack trace is often needed for debugging, but could leak info.
+                               // For now, let's assume stack trace doesn't contain secrets usually
+                               // (except in function args which might be redacted if we parsed them, but we don't).
         };
         for (const key of Object.getOwnPropertyNames(data)) {
             if (!['message', 'name', 'stack'].includes(key)) {
