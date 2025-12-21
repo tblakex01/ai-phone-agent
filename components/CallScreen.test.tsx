@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CallScreen from './CallScreen';
 import { PersonaConfig } from '../types';
 import * as geminiService from '../services/geminiService';
+import { MAX_TRANSCRIPTION_HISTORY } from '../constants';
 
 // Mock the geminiService
 vi.mock('../services/geminiService', () => ({
@@ -616,5 +617,62 @@ describe('CallScreen', () => {
       // Verify code path was exercised
       expect(capturedCallbacks.onMessage).toBeDefined();
     });
+  });
+
+  it('should limit transcription history to MAX_TRANSCRIPTION_HISTORY', async () => {
+    let capturedCallbacks: any;
+    mockConnectToLiveSession.mockImplementation((callbacks) => {
+      capturedCallbacks = callbacks;
+      return Promise.resolve({
+        close: vi.fn(),
+        send: vi.fn(),
+        sendRealtimeInput: vi.fn(),
+      });
+    });
+
+    // Force fallback to connectToLiveApi to capture callbacks easily
+    mockGenerateGreetingAudio.mockRejectedValueOnce(new Error('TTS failed'));
+
+    render(<CallScreen onEndCall={mockOnEndCall} config={mockConfig} />);
+
+    await waitFor(() => {
+        expect(mockConnectToLiveSession).toHaveBeenCalled();
+    });
+
+    // Simulate more messages than the limit
+    const messagesToSend = Math.ceil(MAX_TRANSCRIPTION_HISTORY / 2) + 5; // Each turn produces 2 entries
+
+    await act(async () => {
+        for (let i = 0; i < messagesToSend; i++) {
+            // Send user input
+            capturedCallbacks.onMessage({
+                serverContent: {
+                    inputTranscription: { text: `User message ${i}` }
+                }
+            });
+            // Send agent output
+            capturedCallbacks.onMessage({
+                serverContent: {
+                    outputTranscription: { text: `Agent message ${i}` }
+                }
+            });
+            // Complete turn
+            capturedCallbacks.onMessage({
+                serverContent: {
+                    turnComplete: true
+                }
+            });
+        }
+    });
+
+    // We expect the *last* messages to be present.
+    // "User message {messagesToSend - 1}" should be there.
+    const lastUserMessage = `User message ${messagesToSend - 1}`;
+    expect(screen.getByText(lastUserMessage)).toBeInTheDocument();
+
+    // The first message should have been rotated out.
+    // "User message 0" should NOT be there.
+    const firstUserMessage = `User message 0`;
+    expect(screen.queryByText(firstUserMessage)).not.toBeInTheDocument();
   });
 });

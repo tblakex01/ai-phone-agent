@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CallStatus, TranscriptionEntry, PersonaConfig } from '../types';
+import { MAX_TRANSCRIPTION_HISTORY } from '../constants';
 import { connectToLiveSession, generateGreetingAudio } from '../services/geminiService';
 import { decode, encode, decodeAudioData, floatToPcmInt16 } from '../utils/audioUtils';
 import { logger } from '../utils/logger';
@@ -98,11 +99,17 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall, config }) => {
       }
 
       if (message.serverContent?.turnComplete) {
-          setTranscription(prev => [
-              ...prev,
-              { speaker: 'user' as const, text: currentInputTranscriptionRef.current },
-              { speaker: 'agent' as const, text: currentOutputTranscriptionRef.current }
-          ].filter(entry => entry.text.trim() !== ''));
+          const userText = currentInputTranscriptionRef.current;
+          const agentText = currentOutputTranscriptionRef.current;
+
+          setTranscription(prev => {
+              const newEntries = [
+                  ...prev,
+                  { speaker: 'user' as const, text: userText },
+                  { speaker: 'agent' as const, text: agentText }
+              ].filter(entry => entry.text.trim() !== '');
+              return newEntries.slice(-MAX_TRANSCRIPTION_HISTORY);
+          });
           currentInputTranscriptionRef.current = '';
           currentOutputTranscriptionRef.current = '';
           if (!isPlayingAudioRef.current) {
