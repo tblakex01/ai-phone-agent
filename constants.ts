@@ -7,6 +7,8 @@ export const DEFAULT_SYSTEM_INSTRUCTION = 'You are a professional, helpful, and 
 
 export const DEFAULT_GREETING_MESSAGE = 'Hello, this is your personal AI assistant. How can I help you today?';
 
+export const MAX_TRANSCRIPTION_HISTORY = 100;
+
 export const VOICE_NAMES: VoiceName[] = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'];
 
 export const PERSONA_PRESETS: (PersonaConfig & { id: string })[] = [
