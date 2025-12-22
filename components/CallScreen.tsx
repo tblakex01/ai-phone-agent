@@ -4,6 +4,7 @@ import { CallStatus, TranscriptionEntry, PersonaConfig } from '../types';
 import { connectToLiveSession, generateGreetingAudio } from '../services/geminiService';
 import { decode, encode, decodeAudioData, floatToPcmInt16 } from '../utils/audioUtils';
 import { logger } from '../utils/logger';
+import { MAX_TRANSCRIPTION_HISTORY } from '../constants';
 import { PhoneHangupIcon } from './Icons';
 import StatusIndicator from './StatusIndicator';
 import { LiveServerMessage, Blob as GenAIBlob } from '@google/genai';
@@ -98,11 +99,21 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall, config }) => {
       }
 
       if (message.serverContent?.turnComplete) {
-          setTranscription(prev => [
-              ...prev,
-              { speaker: 'user' as const, text: currentInputTranscriptionRef.current },
-              { speaker: 'agent' as const, text: currentOutputTranscriptionRef.current }
-          ].filter(entry => entry.text.trim() !== ''));
+          const userText = currentInputTranscriptionRef.current;
+          const agentText = currentOutputTranscriptionRef.current;
+
+          setTranscription(prev => {
+              const newEntries = [
+                  ...prev,
+                  { speaker: 'user' as const, text: userText },
+                  { speaker: 'agent' as const, text: agentText }
+              ].filter(entry => entry.text.trim() !== '');
+
+              if (newEntries.length > MAX_TRANSCRIPTION_HISTORY) {
+                  return newEntries.slice(newEntries.length - MAX_TRANSCRIPTION_HISTORY);
+              }
+              return newEntries;
+          });
           currentInputTranscriptionRef.current = '';
           currentOutputTranscriptionRef.current = '';
           if (!isPlayingAudioRef.current) {
