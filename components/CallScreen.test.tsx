@@ -616,5 +616,50 @@ describe('CallScreen', () => {
       // Verify code path was exercised
       expect(capturedCallbacks.onMessage).toBeDefined();
     });
+
+    it('should limit transcription history to MAX_TRANSCRIPTION_HISTORY', async () => {
+      let capturedCallbacks: any;
+      mockConnectToLiveSession.mockImplementation((callbacks) => {
+        capturedCallbacks = callbacks;
+        return Promise.resolve({
+          close: vi.fn(),
+          send: vi.fn(),
+          sendRealtimeInput: vi.fn(),
+        });
+      });
+
+      mockGenerateGreetingAudio.mockRejectedValueOnce(new Error('TTS failed'));
+
+      const { container } = render(<CallScreen onEndCall={mockOnEndCall} config={mockConfig} />);
+
+      await waitFor(() => {
+        expect(mockConnectToLiveSession).toHaveBeenCalled();
+      });
+
+      // Simulate a large number of turns
+      const MAX_TRANSCRIPTION_HISTORY = 100;
+      const EXTRA_ENTRIES = 10;
+      const TOTAL_ENTRIES = MAX_TRANSCRIPTION_HISTORY + EXTRA_ENTRIES;
+
+      for (let i = 0; i < TOTAL_ENTRIES / 2; i++) { // Each turn adds 2 entries (user + agent)
+        // User message
+        capturedCallbacks.onMessage({
+          serverContent: { inputTranscription: { text: `User message ${i}` } },
+        });
+        // Agent message
+        capturedCallbacks.onMessage({
+          serverContent: { outputTranscription: { text: `Agent message ${i}` } },
+        });
+        // Turn complete
+        capturedCallbacks.onMessage({
+          serverContent: { turnComplete: true },
+        });
+      }
+
+      await waitFor(() => {
+        const bubbles = container.querySelectorAll('.rounded-2xl');
+        expect(bubbles.length).toBe(MAX_TRANSCRIPTION_HISTORY);
+      });
+    });
   });
 });
