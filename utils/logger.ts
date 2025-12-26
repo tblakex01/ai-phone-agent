@@ -16,6 +16,13 @@ const SENSITIVE_PATTERNS = [
   /private[-_]?key/i,
 ];
 
+// Patterns for sensitive values that might appear in strings (logs, error messages)
+const SENSITIVE_VALUE_PATTERNS = [
+  /AIza[0-9A-Za-z\-_]{35}/g, // Google API Keys
+  /sk-[a-zA-Z0-9]{32,}/g,    // Common secret keys (Stripe, OpenAI, etc.)
+  /eyJ[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+\.[a-zA-Z0-9\-_]+/g, // JWT tokens
+];
+
 const isSensitiveKey = (key: string): boolean => {
   return SENSITIVE_PATTERNS.some(pattern => pattern.test(key));
 };
@@ -26,7 +33,11 @@ const sanitize = (data: any, seen = new WeakSet()): any => {
   }
 
   if (typeof data === 'string') {
-    return data;
+    let sanitizedString = data;
+    for (const pattern of SENSITIVE_VALUE_PATTERNS) {
+        sanitizedString = sanitizedString.replace(pattern, '***REDACTED***');
+    }
+    return sanitizedString;
   }
 
   if (typeof data === 'function' || typeof data === 'symbol') {
@@ -46,9 +57,9 @@ const sanitize = (data: any, seen = new WeakSet()): any => {
     // Handle Error objects
     if (data instanceof Error) {
         const errorObj: Record<string, any> = {
-            message: data.message,
+            message: sanitize(data.message, seen),
             name: data.name,
-            stack: data.stack,
+            stack: sanitize(data.stack, seen),
         };
         for (const key of Object.getOwnPropertyNames(data)) {
             if (!['message', 'name', 'stack'].includes(key)) {
