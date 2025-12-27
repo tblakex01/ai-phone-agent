@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PhoneIcon, SettingsIcon } from './Icons';
-import { PERSONA_PRESETS, VOICE_NAMES } from '../constants';
+import { PERSONA_PRESETS, VOICE_NAMES, MAX_INPUT_LENGTHS } from '../constants';
 import { PersonaConfig, VoiceName } from '../types';
 
 interface WelcomeScreenProps {
@@ -77,12 +77,14 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                         </div>
 
                         <div>
-                            <label className="block text-xs text-gray-400 mb-1">Name</label>
+                            <label htmlFor="name-input" className="block text-xs text-gray-400 mb-1">Name</label>
                             <input
+                                id="name-input"
                                 type="text"
                                 value={customConfig.name}
                                 onChange={(e) => handleConfigChange('name', e.target.value)}
                                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                maxLength={MAX_INPUT_LENGTHS.NAME}
                             />
                         </div>
                         
@@ -100,22 +102,26 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                         </div>
 
                         <div>
-                            <label className="block text-xs text-gray-400 mb-1">System Instructions</label>
+                            <label htmlFor="system-instruction-input" className="block text-xs text-gray-400 mb-1">System Instructions</label>
                             <textarea 
+                                id="system-instruction-input"
                                 value={customConfig.systemInstruction}
                                 onChange={(e) => handleConfigChange('systemInstruction', e.target.value)}
                                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none h-24 resize-none"
                                 placeholder="Describe how the agent should behave..."
+                                maxLength={MAX_INPUT_LENGTHS.SYSTEM_INSTRUCTION}
                             />
                         </div>
 
                          <div>
-                            <label className="block text-xs text-gray-400 mb-1">Greeting Message</label>
+                            <label htmlFor="greeting-input" className="block text-xs text-gray-400 mb-1">Greeting Message</label>
                             <textarea 
+                                id="greeting-input"
                                 value={customConfig.greeting}
                                 onChange={(e) => handleConfigChange('greeting', e.target.value)}
                                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none h-16 resize-none"
                                 placeholder="What the agent says first..."
+                                maxLength={MAX_INPUT_LENGTHS.GREETING}
                             />
                         </div>
                     </div>
