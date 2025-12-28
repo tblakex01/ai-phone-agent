@@ -4,6 +4,7 @@ import { CallStatus, TranscriptionEntry, PersonaConfig } from '../types';
 import { connectToLiveSession, generateGreetingAudio } from '../services/geminiService';
 import { decode, encode, decodeAudioData, floatToPcmInt16 } from '../utils/audioUtils';
 import { logger } from '../utils/logger';
+import { MAX_TRANSCRIPTION_HISTORY } from '../constants';
 import { PhoneHangupIcon } from './Icons';
 import StatusIndicator from './StatusIndicator';
 import { LiveServerMessage, Blob as GenAIBlob } from '@google/genai';
@@ -98,11 +99,14 @@ const CallScreen: React.FC<CallScreenProps> = ({ onEndCall, config }) => {
       }
 
       if (message.serverContent?.turnComplete) {
-          setTranscription(prev => [
-              ...prev,
-              { speaker: 'user' as const, text: currentInputTranscriptionRef.current },
-              { speaker: 'agent' as const, text: currentOutputTranscriptionRef.current }
-          ].filter(entry => entry.text.trim() !== ''));
+          setTranscription(prev => {
+              const newHistory = [
+                  ...prev,
+                  { speaker: 'user' as const, text: currentInputTranscriptionRef.current },
+                  { speaker: 'agent' as const, text: currentOutputTranscriptionRef.current }
+              ].filter(entry => entry.text.trim() !== '');
+              return newHistory.slice(-MAX_TRANSCRIPTION_HISTORY);
+          });
           currentInputTranscriptionRef.current = '';
           currentOutputTranscriptionRef.current = '';
           if (!isPlayingAudioRef.current) {

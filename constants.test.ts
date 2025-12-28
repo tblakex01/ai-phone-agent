@@ -6,10 +6,26 @@ import {
   DEFAULT_GREETING_MESSAGE,
   VOICE_NAMES,
   PERSONA_PRESETS,
+  MAX_TRANSCRIPTION_HISTORY,
+  MAX_INPUT_LENGTHS,
 } from './constants';
 import type { VoiceName } from './types';
 
 describe('constants', () => {
+  describe('limits', () => {
+    it('should have a reasonable max transcription history', () => {
+      expect(MAX_TRANSCRIPTION_HISTORY).toBeDefined();
+      expect(MAX_TRANSCRIPTION_HISTORY).toBe(100);
+    });
+
+    it('should have input length limits', () => {
+      expect(MAX_INPUT_LENGTHS).toBeDefined();
+      expect(MAX_INPUT_LENGTHS.name).toBe(50);
+      expect(MAX_INPUT_LENGTHS.systemInstruction).toBe(2000);
+      expect(MAX_INPUT_LENGTHS.greeting).toBe(500);
+    });
+  });
+
   describe('model names', () => {
     it('should have a valid live model name', () => {
       expect(LIVE_MODEL_NAME).toBeDefined();
