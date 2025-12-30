@@ -16,6 +16,12 @@ const SENSITIVE_PATTERNS = [
   /private[-_]?key/i,
 ];
 
+// Patterns to redact within string values (e.g. accidentally logged API keys)
+const SENSITIVE_STRING_PATTERNS = [
+  // Google API Key pattern: starts with AIza, followed by 35 alphanumeric/dash/underscore chars
+  /\bAIza[0-9A-Za-z\-_]{35}\b/g,
+];
+
 const isSensitiveKey = (key: string): boolean => {
   return SENSITIVE_PATTERNS.some(pattern => pattern.test(key));
 };
@@ -26,7 +32,11 @@ const sanitize = (data: any, seen = new WeakSet()): any => {
   }
 
   if (typeof data === 'string') {
-    return data;
+    let sanitizedString = data;
+    SENSITIVE_STRING_PATTERNS.forEach(pattern => {
+      sanitizedString = sanitizedString.replace(pattern, '***REDACTED***');
+    });
+    return sanitizedString;
   }
 
   if (typeof data === 'function' || typeof data === 'symbol') {
