@@ -87,4 +87,21 @@ describe('Secure Logger', () => {
       );
       consoleSpy.mockRestore();
   });
+
+  it('should redact sensitive patterns in strings', () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const secret = 'AIzaSyD-1234567890abcdef1234567890abcde'; // Example Google API Key format
+    const message = `Failed with key: ${secret} check it out`;
+
+    logger.error(message);
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('***REDACTED***')
+    );
+    expect(consoleSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining(secret)
+    );
+
+    consoleSpy.mockRestore();
+  });
 });
