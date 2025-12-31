@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PhoneIcon, SettingsIcon } from './Icons';
-import { PERSONA_PRESETS, VOICE_NAMES } from '../constants';
+import { PERSONA_PRESETS, VOICE_NAMES, MAX_INPUT_LENGTHS } from '../constants';
 import { PersonaConfig, VoiceName } from '../types';
 
 interface WelcomeScreenProps {
@@ -82,6 +82,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                                 type="text"
                                 value={customConfig.name}
                                 onChange={(e) => handleConfigChange('name', e.target.value)}
+                                maxLength={MAX_INPUT_LENGTHS.name}
                                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none"
                             />
                         </div>
@@ -104,6 +105,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                             <textarea 
                                 value={customConfig.systemInstruction}
                                 onChange={(e) => handleConfigChange('systemInstruction', e.target.value)}
+                                maxLength={MAX_INPUT_LENGTHS.systemInstruction}
                                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none h-24 resize-none"
                                 placeholder="Describe how the agent should behave..."
                             />
@@ -114,6 +116,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                             <textarea 
                                 value={customConfig.greeting}
                                 onChange={(e) => handleConfigChange('greeting', e.target.value)}
+                                maxLength={MAX_INPUT_LENGTHS.greeting}
                                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none h-16 resize-none"
                                 placeholder="What the agent says first..."
                             />
