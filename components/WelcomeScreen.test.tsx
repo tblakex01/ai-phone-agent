@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import WelcomeScreen from './WelcomeScreen';
-import { PERSONA_PRESETS, VOICE_NAMES } from '../constants';
+import { PERSONA_PRESETS, VOICE_NAMES, MAX_INPUT_LENGTHS } from '../constants';
 
 describe('WelcomeScreen', () => {
   const mockOnStartCall = vi.fn();
@@ -118,6 +118,21 @@ describe('WelcomeScreen', () => {
       expect(screen.getByText('Name')).toBeInTheDocument();
       expect(screen.getByText('System Instructions')).toBeInTheDocument();
       expect(screen.getByText('Greeting Message')).toBeInTheDocument();
+    });
+
+    it('should enforce max length on inputs', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+      await user.click(screen.getByText('Configure'));
+
+      const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+      const instructionsTextarea = screen.getByPlaceholderText(/describe how the agent should behave/i) as HTMLTextAreaElement;
+      const greetingTextarea = screen.getByPlaceholderText(/what the agent says first/i) as HTMLTextAreaElement;
+
+      expect(nameInput.maxLength).toBe(MAX_INPUT_LENGTHS.NAME);
+      expect(instructionsTextarea.maxLength).toBe(MAX_INPUT_LENGTHS.SYSTEM_INSTRUCTION);
+      expect(greetingTextarea.maxLength).toBe(MAX_INPUT_LENGTHS.GREETING);
     });
   });
 
