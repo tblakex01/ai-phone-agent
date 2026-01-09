@@ -335,4 +335,395 @@ describe('WelcomeScreen', () => {
       expect(buttons.length).toBeGreaterThan(0);
     });
   });
+
+  describe('input validation and edge cases', () => {
+    describe('empty string inputs', () => {
+      it('should allow empty name field', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+        await user.clear(nameInput);
+
+        // Should allow empty name
+        expect(nameInput.value).toBe('');
+
+        // Should still call onStartCall with empty name
+        const startButton = container.querySelector('.bg-green-500') as HTMLButtonElement;
+        await user.click(startButton);
+
+        expect(mockOnStartCall).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: ''
+          })
+        );
+      });
+
+      it('should allow empty system instructions', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const instructionsTextarea = screen.getByPlaceholderText(/describe how the agent should behave/i);
+        await user.clear(instructionsTextarea);
+
+        expect((instructionsTextarea as HTMLTextAreaElement).value).toBe('');
+
+        const startButton = container.querySelector('.bg-green-500') as HTMLButtonElement;
+        await user.click(startButton);
+
+        expect(mockOnStartCall).toHaveBeenCalledWith(
+          expect.objectContaining({
+            systemInstruction: ''
+          })
+        );
+      });
+
+      it('should allow empty greeting message', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const greetingTextarea = screen.getByPlaceholderText(/what the agent says first/i);
+        await user.clear(greetingTextarea);
+
+        expect((greetingTextarea as HTMLTextAreaElement).value).toBe('');
+
+        const startButton = container.querySelector('.bg-green-500') as HTMLButtonElement;
+        await user.click(startButton);
+
+        expect(mockOnStartCall).toHaveBeenCalledWith(
+          expect.objectContaining({
+            greeting: ''
+          })
+        );
+      });
+    });
+
+    describe('very long input text', () => {
+      it('should handle very long name input', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+        const longName = 'A'.repeat(500);
+        await user.clear(nameInput);
+        await user.type(nameInput, longName);
+
+        expect(nameInput.value).toBe(longName);
+
+        const startButton = container.querySelector('.bg-green-500') as HTMLButtonElement;
+        await user.click(startButton);
+
+        expect(mockOnStartCall).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: longName
+          })
+        );
+      });
+
+      it('should handle very long system instructions', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const instructionsTextarea = screen.getByPlaceholderText(/describe how the agent should behave/i);
+        const longInstructions = 'Instructions '.repeat(100);
+        await user.clear(instructionsTextarea);
+        await user.type(instructionsTextarea, longInstructions);
+
+        expect((instructionsTextarea as HTMLTextAreaElement).value).toBe(longInstructions);
+      });
+
+      it('should handle very long greeting message', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const greetingTextarea = screen.getByPlaceholderText(/what the agent says first/i);
+        const longGreeting = 'Hello '.repeat(200);
+        await user.clear(greetingTextarea);
+        await user.type(greetingTextarea, longGreeting);
+
+        expect((greetingTextarea as HTMLTextAreaElement).value).toBe(longGreeting);
+      });
+    });
+
+    describe('special characters in inputs', () => {
+      it('should handle special characters in name', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+        const specialName = '<script>alert("xss")</script>';
+        await user.clear(nameInput);
+        await user.type(nameInput, specialName);
+
+        expect(nameInput.value).toBe(specialName);
+
+        const startButton = container.querySelector('.bg-green-500') as HTMLButtonElement;
+        await user.click(startButton);
+
+        expect(mockOnStartCall).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: specialName
+          })
+        );
+      });
+
+      it('should handle unicode characters in inputs', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+        const unicodeName = '日本語アシスタント 🤖';
+        await user.clear(nameInput);
+        await user.type(nameInput, unicodeName);
+
+        expect(nameInput.value).toBe(unicodeName);
+      });
+
+      it('should handle newlines in textarea inputs', async () => {
+        const user = userEvent.setup();
+        render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const instructionsTextarea = screen.getByPlaceholderText(/describe how the agent should behave/i) as HTMLTextAreaElement;
+        await user.clear(instructionsTextarea);
+        await user.type(instructionsTextarea, 'Line 1{enter}Line 2{enter}Line 3');
+
+        expect(instructionsTextarea.value).toContain('Line 1');
+        expect(instructionsTextarea.value).toContain('Line 2');
+      });
+
+      it('should handle HTML entities in inputs', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+        const htmlEntities = '&amp; &lt; &gt; &quot;';
+        await user.clear(nameInput);
+        await user.type(nameInput, htmlEntities);
+
+        expect(nameInput.value).toBe(htmlEntities);
+      });
+
+      it('should handle quotes in inputs', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const greetingTextarea = screen.getByPlaceholderText(/what the agent says first/i) as HTMLTextAreaElement;
+        await user.clear(greetingTextarea);
+        await user.type(greetingTextarea, 'Hello! I\'m your "helpful" assistant.');
+
+        expect(greetingTextarea.value).toContain("I'm");
+        expect(greetingTextarea.value).toContain('"helpful"');
+      });
+    });
+
+    describe('whitespace-only inputs', () => {
+      it('should handle whitespace-only name', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+        await user.clear(nameInput);
+        await user.type(nameInput, '   ');
+
+        expect(nameInput.value).toBe('   ');
+
+        const startButton = container.querySelector('.bg-green-500') as HTMLButtonElement;
+        await user.click(startButton);
+
+        expect(mockOnStartCall).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: '   '
+          })
+        );
+      });
+
+      it('should handle tabs and mixed whitespace', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+        await user.clear(nameInput);
+        // Tab characters might be converted, but spaces should work
+        await user.type(nameInput, '  test  ');
+
+        expect(nameInput.value).toBe('  test  ');
+      });
+    });
+
+    describe('rapid input changes', () => {
+      it('should handle rapid typing in name field', async () => {
+        const user = userEvent.setup({ delay: null }); // No delay for rapid input
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+        await user.clear(nameInput);
+        await user.type(nameInput, 'RapidTypingTest');
+
+        expect(nameInput.value).toBe('RapidTypingTest');
+      });
+
+      it('should handle rapid preset switching', async () => {
+        const user = userEvent.setup({ delay: null });
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const selects = container.querySelectorAll('select');
+        const presetSelect = selects[0];
+
+        // Rapidly switch between presets
+        for (let i = 0; i < PERSONA_PRESETS.length; i++) {
+          await user.selectOptions(presetSelect, PERSONA_PRESETS[i].id);
+        }
+
+        // Final state should be last preset
+        expect((presetSelect as HTMLSelectElement).value).toBe(
+          PERSONA_PRESETS[PERSONA_PRESETS.length - 1].id
+        );
+      });
+
+      it('should handle clearing and re-typing quickly', async () => {
+        const user = userEvent.setup({ delay: null });
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+
+        // Clear and type multiple times
+        for (let i = 0; i < 3; i++) {
+          await user.clear(nameInput);
+          await user.type(nameInput, `Name${i}`);
+        }
+
+        expect(nameInput.value).toBe('Name2');
+      });
+    });
+
+    describe('input boundaries', () => {
+      it('should handle single character input', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+        await user.clear(nameInput);
+        await user.type(nameInput, 'A');
+
+        expect(nameInput.value).toBe('A');
+
+        const startButton = container.querySelector('.bg-green-500') as HTMLButtonElement;
+        await user.click(startButton);
+
+        expect(mockOnStartCall).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'A'
+          })
+        );
+      });
+
+      it('should preserve input when toggling config panel', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+        await user.clear(nameInput);
+        await user.type(nameInput, 'Preserved Name');
+
+        // Close config
+        await user.click(screen.getByText('Hide'));
+
+        // Re-open config
+        await user.click(screen.getByText('Configure'));
+
+        const nameInputAfter = container.querySelector('input[type="text"]') as HTMLInputElement;
+        expect(nameInputAfter.value).toBe('Preserved Name');
+      });
+    });
+
+    describe('concurrent field modifications', () => {
+      it('should handle modifying multiple fields rapidly', async () => {
+        const user = userEvent.setup({ delay: null });
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+        const instructionsTextarea = screen.getByPlaceholderText(/describe how the agent should behave/i);
+        const greetingTextarea = screen.getByPlaceholderText(/what the agent says first/i);
+
+        await user.clear(nameInput);
+        await user.type(nameInput, 'Custom Name');
+
+        await user.clear(instructionsTextarea);
+        await user.type(instructionsTextarea, 'Custom Instructions');
+
+        await user.clear(greetingTextarea);
+        await user.type(greetingTextarea, 'Custom Greeting');
+
+        const startButton = container.querySelector('.bg-green-500') as HTMLButtonElement;
+        await user.click(startButton);
+
+        expect(mockOnStartCall).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'Custom Name',
+            systemInstruction: 'Custom Instructions',
+            greeting: 'Custom Greeting'
+          })
+        );
+      });
+
+      it('should switch to custom when any field is modified', async () => {
+        const user = userEvent.setup();
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+
+        await user.click(screen.getByText('Configure'));
+
+        // First select a preset
+        const selects = container.querySelectorAll('select');
+        const presetSelect = selects[0] as HTMLSelectElement;
+        await user.selectOptions(presetSelect, PERSONA_PRESETS[1].id);
+
+        expect(presetSelect.value).toBe(PERSONA_PRESETS[1].id);
+
+        // Then modify the name
+        const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+        await user.type(nameInput, ' Modified');
+
+        // Should switch to custom
+        expect(presetSelect.value).toBe('custom');
+      });
+    });
+  });
 });
