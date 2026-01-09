@@ -414,7 +414,7 @@ describe('WelcomeScreen', () => {
         const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
         const longName = 'A'.repeat(500);
         await user.clear(nameInput);
-        await user.type(nameInput, longName);
+        await user.paste(longName);
 
         expect(nameInput.value).toBe(longName);
 
@@ -437,7 +437,7 @@ describe('WelcomeScreen', () => {
         const instructionsTextarea = screen.getByPlaceholderText(/describe how the agent should behave/i);
         const longInstructions = 'Instructions '.repeat(100);
         await user.clear(instructionsTextarea);
-        await user.type(instructionsTextarea, longInstructions);
+        await user.paste(longInstructions);
 
         expect((instructionsTextarea as HTMLTextAreaElement).value).toBe(longInstructions);
       });
@@ -451,7 +451,7 @@ describe('WelcomeScreen', () => {
         const greetingTextarea = screen.getByPlaceholderText(/what the agent says first/i);
         const longGreeting = 'Hello '.repeat(200);
         await user.clear(greetingTextarea);
-        await user.type(greetingTextarea, longGreeting);
+        await user.paste(longGreeting);
 
         expect((greetingTextarea as HTMLTextAreaElement).value).toBe(longGreeting);
       });
