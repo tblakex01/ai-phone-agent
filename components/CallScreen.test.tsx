@@ -759,6 +759,11 @@ describe('CallScreen', () => {
         serverContent: { turnComplete: true },
       });
 
+      // Verify first turn completion triggers status change to LISTENING
+      await waitFor(() => {
+        expect(screen.getByText(/listening/i)).toBeInTheDocument();
+      });
+
       // Second turn immediately after
       capturedCallbacks.onMessage({
         serverContent: { inputTranscription: { text: 'Second question' } },
@@ -770,8 +775,10 @@ describe('CallScreen', () => {
         serverContent: { turnComplete: true },
       });
 
-      // Verify the consecutive turn completions were processed (code coverage achieved)
-      expect(capturedCallbacks.onMessage).toBeDefined();
+      // Verify second turn also completes (status remains LISTENING)
+      await waitFor(() => {
+        expect(screen.getByText(/listening/i)).toBeInTheDocument();
+      });
     });
 
     it('should handle empty messages gracefully', async () => {
@@ -798,8 +805,11 @@ describe('CallScreen', () => {
       capturedCallbacks.onMessage({ serverContent: { outputTranscription: { text: '' } } });
       capturedCallbacks.onMessage({ serverContent: { turnComplete: true } });
 
-      // Should not crash and should filter out empty transcriptions
-      expect(capturedCallbacks.onMessage).toBeDefined();
+      // Should not crash and empty transcriptions should be filtered out
+      await waitFor(() => {
+        const transcriptContainer = document.querySelector('[class*="overflow-y-auto"]');
+        expect(transcriptContainer?.children.length).toBe(0);
+      });
     });
 
     it('should handle messages with undefined audio data', async () => {
@@ -870,9 +880,10 @@ describe('CallScreen', () => {
         serverContent: { turnComplete: true },
       });
 
-      // Verify the message handler processed the messages (coverage achieved)
-      // The transcription accumulation happens internally via refs
-      expect(capturedCallbacks.onMessage).toBeDefined();
+      // Verify turnComplete was processed (status changes to LISTENING after turn ends)
+      await waitFor(() => {
+        expect(screen.getByText(/listening/i)).toBeInTheDocument();
+      });
     });
 
     it('should handle rapid session state changes', async () => {
