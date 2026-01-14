@@ -6,6 +6,7 @@ import {
   DEFAULT_GREETING_MESSAGE,
   VOICE_NAMES,
   PERSONA_PRESETS,
+  MAX_INPUT_LENGTHS,
 } from './constants';
 import type { VoiceName } from './types';
 
@@ -25,6 +26,21 @@ describe('constants', () => {
 
     it('should have different model names for live and TTS', () => {
       expect(LIVE_MODEL_NAME).not.toBe(TTS_MODEL_NAME);
+    });
+  });
+
+  describe('security limits', () => {
+    it('should have defined input length limits', () => {
+        expect(MAX_INPUT_LENGTHS).toBeDefined();
+        expect(MAX_INPUT_LENGTHS.name).toBeGreaterThan(0);
+        expect(MAX_INPUT_LENGTHS.systemInstruction).toBeGreaterThan(0);
+        expect(MAX_INPUT_LENGTHS.greeting).toBeGreaterThan(0);
+        expect(MAX_INPUT_LENGTHS.description).toBeGreaterThan(0);
+    });
+
+    it('should have reasonable limits to prevent DoS', () => {
+        expect(MAX_INPUT_LENGTHS.systemInstruction).toBeLessThanOrEqual(5000); // 5KB limit is reasonable
+        expect(MAX_INPUT_LENGTHS.greeting).toBeLessThanOrEqual(1000);
     });
   });
 
