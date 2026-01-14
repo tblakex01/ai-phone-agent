@@ -9,6 +9,13 @@ export const DEFAULT_GREETING_MESSAGE = 'Hello, this is your personal AI assista
 
 export const VOICE_NAMES: VoiceName[] = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'];
 
+export const MAX_INPUT_LENGTHS = {
+  name: 50,
+  description: 100,
+  systemInstruction: 2000,
+  greeting: 500
+};
+
 export const PERSONA_PRESETS: (PersonaConfig & { id: string })[] = [
   {
     id: 'assistant',

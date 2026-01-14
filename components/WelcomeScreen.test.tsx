@@ -416,14 +416,16 @@ describe('WelcomeScreen', () => {
         await user.clear(nameInput);
         await user.paste(longName);
 
-        expect(nameInput.value).toBe(longName);
+        // Input should be truncated to 50 characters
+        const expectedName = 'A'.repeat(50);
+        expect(nameInput.value).toBe(expectedName);
 
         const startButton = container.querySelector('.bg-green-500') as HTMLButtonElement;
         await user.click(startButton);
 
         expect(mockOnStartCall).toHaveBeenCalledWith(
           expect.objectContaining({
-            name: longName
+            name: expectedName
           })
         );
       });
@@ -453,7 +455,11 @@ describe('WelcomeScreen', () => {
         await user.clear(greetingTextarea);
         await user.paste(longGreeting);
 
-        expect((greetingTextarea as HTMLTextAreaElement).value).toBe(longGreeting);
+        // Input should be truncated to 500 characters
+        // 'Hello ' is 6 chars. 200 * 6 = 1200 chars.
+        // It should be truncated to first 500.
+        const expectedGreeting = longGreeting.slice(0, 500);
+        expect((greetingTextarea as HTMLTextAreaElement).value).toBe(expectedGreeting);
       });
     });
 
