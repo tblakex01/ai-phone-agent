@@ -6,6 +6,7 @@ import {
   DEFAULT_GREETING_MESSAGE,
   VOICE_NAMES,
   PERSONA_PRESETS,
+  MAX_INPUT_LENGTHS,
 } from './constants';
 import type { VoiceName } from './types';
 
@@ -143,6 +144,16 @@ describe('constants', () => {
     it('should use diverse voices across presets', () => {
       const usedVoices = new Set(PERSONA_PRESETS.map((p) => p.voice));
       expect(usedVoices.size).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  describe('input limits', () => {
+    it('should define input limits', () => {
+        expect(MAX_INPUT_LENGTHS).toBeDefined();
+        expect(MAX_INPUT_LENGTHS.name).toBe(50);
+        expect(MAX_INPUT_LENGTHS.systemInstruction).toBe(2000);
+        expect(MAX_INPUT_LENGTHS.greeting).toBe(500);
+        expect(MAX_INPUT_LENGTHS.description).toBe(100);
     });
   });
 

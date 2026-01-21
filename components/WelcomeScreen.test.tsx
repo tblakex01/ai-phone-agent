@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import WelcomeScreen from './WelcomeScreen';
-import { PERSONA_PRESETS, VOICE_NAMES } from '../constants';
+import { PERSONA_PRESETS, VOICE_NAMES, MAX_INPUT_LENGTHS } from '../constants';
 
 describe('WelcomeScreen', () => {
   const mockOnStartCall = vi.fn();
@@ -405,55 +405,58 @@ describe('WelcomeScreen', () => {
     });
 
     describe('very long input text', () => {
-      it('should handle very long name input', async () => {
+      it('should enforce name length limit', async () => {
         const user = userEvent.setup();
         const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
 
         await user.click(screen.getByText('Configure'));
 
         const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
-        const longName = 'A'.repeat(500);
+        const longName = 'A'.repeat(MAX_INPUT_LENGTHS.name + 10);
         await user.clear(nameInput);
         await user.paste(longName);
 
-        expect(nameInput.value).toBe(longName);
+        expect(nameInput.value.length).toBe(MAX_INPUT_LENGTHS.name);
+        expect(nameInput.value).toBe(longName.slice(0, MAX_INPUT_LENGTHS.name));
 
         const startButton = container.querySelector('.bg-green-500') as HTMLButtonElement;
         await user.click(startButton);
 
         expect(mockOnStartCall).toHaveBeenCalledWith(
           expect.objectContaining({
-            name: longName
+            name: longName.slice(0, MAX_INPUT_LENGTHS.name)
           })
         );
       });
 
-      it('should handle very long system instructions', async () => {
+      it('should enforce system instructions length limit', async () => {
         const user = userEvent.setup();
         const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
 
         await user.click(screen.getByText('Configure'));
 
         const instructionsTextarea = screen.getByPlaceholderText(/describe how the agent should behave/i);
-        const longInstructions = 'Instructions '.repeat(100);
+        const longInstructions = 'A'.repeat(MAX_INPUT_LENGTHS.systemInstruction + 100);
         await user.clear(instructionsTextarea);
         await user.paste(longInstructions);
 
-        expect((instructionsTextarea as HTMLTextAreaElement).value).toBe(longInstructions);
+        expect((instructionsTextarea as HTMLTextAreaElement).value.length).toBe(MAX_INPUT_LENGTHS.systemInstruction);
+        expect((instructionsTextarea as HTMLTextAreaElement).value).toBe(longInstructions.slice(0, MAX_INPUT_LENGTHS.systemInstruction));
       });
 
-      it('should handle very long greeting message', async () => {
+      it('should enforce greeting message length limit', async () => {
         const user = userEvent.setup();
         const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
 
         await user.click(screen.getByText('Configure'));
 
         const greetingTextarea = screen.getByPlaceholderText(/what the agent says first/i);
-        const longGreeting = 'Hello '.repeat(200);
+        const longGreeting = 'A'.repeat(MAX_INPUT_LENGTHS.greeting + 50);
         await user.clear(greetingTextarea);
         await user.paste(longGreeting);
 
-        expect((greetingTextarea as HTMLTextAreaElement).value).toBe(longGreeting);
+        expect((greetingTextarea as HTMLTextAreaElement).value.length).toBe(MAX_INPUT_LENGTHS.greeting);
+        expect((greetingTextarea as HTMLTextAreaElement).value).toBe(longGreeting.slice(0, MAX_INPUT_LENGTHS.greeting));
       });
     });
 
