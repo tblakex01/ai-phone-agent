@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PhoneIcon, SettingsIcon } from './Icons';
-import { PERSONA_PRESETS, VOICE_NAMES } from '../constants';
+import { PERSONA_PRESETS, VOICE_NAMES, MAX_INPUT_LENGTHS } from '../constants';
 import { PersonaConfig, VoiceName } from '../types';
 
 interface WelcomeScreenProps {
@@ -77,9 +77,13 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                         </div>
 
                         <div>
-                            <label className="block text-xs text-gray-400 mb-1">Name</label>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="block text-xs text-gray-400">Name</label>
+                                <span className="text-[10px] text-gray-500">{customConfig.name.length}/{MAX_INPUT_LENGTHS.name}</span>
+                            </div>
                             <input
                                 type="text"
+                                maxLength={MAX_INPUT_LENGTHS.name}
                                 value={customConfig.name}
                                 onChange={(e) => handleConfigChange('name', e.target.value)}
                                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none"
@@ -100,8 +104,12 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                         </div>
 
                         <div>
-                            <label className="block text-xs text-gray-400 mb-1">System Instructions</label>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="block text-xs text-gray-400">System Instructions</label>
+                                <span className="text-[10px] text-gray-500">{customConfig.systemInstruction.length}/{MAX_INPUT_LENGTHS.systemInstruction}</span>
+                            </div>
                             <textarea 
+                                maxLength={MAX_INPUT_LENGTHS.systemInstruction}
                                 value={customConfig.systemInstruction}
                                 onChange={(e) => handleConfigChange('systemInstruction', e.target.value)}
                                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none h-24 resize-none"
@@ -110,8 +118,12 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                         </div>
 
                          <div>
-                            <label className="block text-xs text-gray-400 mb-1">Greeting Message</label>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="block text-xs text-gray-400">Greeting Message</label>
+                                <span className="text-[10px] text-gray-500">{customConfig.greeting.length}/{MAX_INPUT_LENGTHS.greeting}</span>
+                            </div>
                             <textarea 
+                                maxLength={MAX_INPUT_LENGTHS.greeting}
                                 value={customConfig.greeting}
                                 onChange={(e) => handleConfigChange('greeting', e.target.value)}
                                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none h-16 resize-none"

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import WelcomeScreen from './WelcomeScreen';
-import { PERSONA_PRESETS, VOICE_NAMES } from '../constants';
+import { PERSONA_PRESETS, VOICE_NAMES, MAX_INPUT_LENGTHS } from '../constants';
 
 describe('WelcomeScreen', () => {
   const mockOnStartCall = vi.fn();
@@ -416,14 +416,15 @@ describe('WelcomeScreen', () => {
         await user.clear(nameInput);
         await user.paste(longName);
 
-        expect(nameInput.value).toBe(longName);
+        const expectedName = longName.slice(0, MAX_INPUT_LENGTHS.name);
+        expect(nameInput.value).toBe(expectedName);
 
         const startButton = container.querySelector('.bg-green-500') as HTMLButtonElement;
         await user.click(startButton);
 
         expect(mockOnStartCall).toHaveBeenCalledWith(
           expect.objectContaining({
-            name: longName
+            name: expectedName
           })
         );
       });
@@ -453,7 +454,7 @@ describe('WelcomeScreen', () => {
         await user.clear(greetingTextarea);
         await user.paste(longGreeting);
 
-        expect((greetingTextarea as HTMLTextAreaElement).value).toBe(longGreeting);
+        expect((greetingTextarea as HTMLTextAreaElement).value).toBe(longGreeting.slice(0, MAX_INPUT_LENGTHS.greeting));
       });
     });
 
