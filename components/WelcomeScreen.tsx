@@ -25,9 +25,24 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
   };
 
   const handleConfigChange = (field: keyof PersonaConfig, value: string) => {
+    // Input Validation & Length Limits
+    let sanitizedValue = value;
+
+    // Limits
+    const LIMITS: Record<string, number> = {
+      name: 50,
+      systemInstruction: 2000,
+      greeting: 500,
+      description: 200
+    };
+
+    if (field in LIMITS && value.length > LIMITS[field]) {
+       sanitizedValue = value.substring(0, LIMITS[field]);
+    }
+
     setCustomConfig(prev => ({
       ...prev,
-      [field]: value
+      [field]: sanitizedValue
     }));
     setSelectedPresetId('custom');
   };
@@ -81,6 +96,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                             <input
                                 type="text"
                                 value={customConfig.name}
+                                maxLength={50}
                                 onChange={(e) => handleConfigChange('name', e.target.value)}
                                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none"
                             />
@@ -103,6 +119,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                             <label className="block text-xs text-gray-400 mb-1">System Instructions</label>
                             <textarea 
                                 value={customConfig.systemInstruction}
+                                maxLength={2000}
                                 onChange={(e) => handleConfigChange('systemInstruction', e.target.value)}
                                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none h-24 resize-none"
                                 placeholder="Describe how the agent should behave..."
@@ -113,6 +130,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                             <label className="block text-xs text-gray-400 mb-1">Greeting Message</label>
                             <textarea 
                                 value={customConfig.greeting}
+                                maxLength={500}
                                 onChange={(e) => handleConfigChange('greeting', e.target.value)}
                                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none h-16 resize-none"
                                 placeholder="What the agent says first..."
