@@ -25,10 +25,6 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
   };
 
   const handleConfigChange = (field: keyof PersonaConfig, value: string) => {
-    // Enforce max length limits
-    if (field === 'name' && value.length > MAX_INPUT_LENGTHS.name) return;
-    if (field === 'systemInstruction' && value.length > MAX_INPUT_LENGTHS.systemInstruction) return;
-    if (field === 'greeting' && value.length > MAX_INPUT_LENGTHS.greeting) return;
 
     setCustomConfig(prev => ({
       ...prev,

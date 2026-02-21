@@ -7,8 +7,7 @@ export const MAX_INPUT_LENGTHS = {
   name: 50,
   systemInstruction: 2000,
   greeting: 500,
-  description: 100
-};
+} as const;
 
 export const DEFAULT_SYSTEM_INSTRUCTION = 'You are a professional, helpful, and friendly personal assistant. Your goal is to efficiently handle tasks like making reservations, scheduling appointments, and making inquiries on behalf of the user. Keep your responses concise and clear. You should act like a real human assistant on a phone call.';
 
