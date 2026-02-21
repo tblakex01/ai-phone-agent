@@ -458,14 +458,24 @@ describe('WelcomeScreen', () => {
 
       it('should show character count indicators', async () => {
         const user = userEvent.setup();
-        render(<WelcomeScreen onStartCall={mockOnStartCall} />);
+        const { container } = render(<WelcomeScreen onStartCall={mockOnStartCall} />);
 
         await user.click(screen.getByText('Configure'));
 
-        // Initial state (default persona)
-        expect(screen.getByText(`${PERSONA_PRESETS[0].name.length}/${MAX_INPUT_LENGTHS.name}`)).toBeInTheDocument();
-        expect(screen.getByText(`${PERSONA_PRESETS[0].systemInstruction.length}/${MAX_INPUT_LENGTHS.systemInstruction}`)).toBeInTheDocument();
-        expect(screen.getByText(`${PERSONA_PRESETS[0].greeting.length}/${MAX_INPUT_LENGTHS.greeting}`)).toBeInTheDocument();
+        // Check name input
+        const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+        const initialNameLength = nameInput.value.length;
+        expect(screen.getByText(`${initialNameLength}/${MAX_INPUT_LENGTHS.name}`)).toBeInTheDocument();
+
+        // Check system instruction
+        const instructionsTextarea = screen.getByPlaceholderText(/describe how the agent should behave/i) as HTMLTextAreaElement;
+        const initialSystemInstructionLength = instructionsTextarea.value.length;
+        expect(screen.getByText(`${initialSystemInstructionLength}/${MAX_INPUT_LENGTHS.systemInstruction}`)).toBeInTheDocument();
+
+        // Check greeting
+        const greetingTextarea = screen.getByPlaceholderText(/what the agent says first/i) as HTMLTextAreaElement;
+        const initialGreetingLength = greetingTextarea.value.length;
+        expect(screen.getByText(`${initialGreetingLength}/${MAX_INPUT_LENGTHS.greeting}`)).toBeInTheDocument();
       });
     });
 
