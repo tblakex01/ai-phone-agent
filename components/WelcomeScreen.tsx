@@ -87,8 +87,12 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                                 value={customConfig.name}
                                 maxLength={MAX_INPUT_LENGTHS.name}
                                 onChange={(e) => handleConfigChange('name', e.target.value)}
+                                maxLength={MAX_INPUT_LENGTHS.name}
                                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none"
                             />
+                            <div className="text-[10px] text-gray-500 text-right mt-1">
+                                {customConfig.name.length}/{MAX_INPUT_LENGTHS.name}
+                            </div>
                         </div>
                         
                         <div>
@@ -113,9 +117,13 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                                 value={customConfig.systemInstruction}
                                 maxLength={MAX_INPUT_LENGTHS.systemInstruction}
                                 onChange={(e) => handleConfigChange('systemInstruction', e.target.value)}
+                                maxLength={MAX_INPUT_LENGTHS.systemInstruction}
                                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none h-24 resize-none"
                                 placeholder="Describe how the agent should behave..."
                             />
+                            <div className="text-[10px] text-gray-500 text-right mt-1">
+                                {customConfig.systemInstruction.length}/{MAX_INPUT_LENGTHS.systemInstruction}
+                            </div>
                         </div>
 
                          <div>
@@ -127,9 +135,13 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                                 value={customConfig.greeting}
                                 maxLength={MAX_INPUT_LENGTHS.greeting}
                                 onChange={(e) => handleConfigChange('greeting', e.target.value)}
+                                maxLength={MAX_INPUT_LENGTHS.greeting}
                                 className="w-full bg-gray-800 border border-gray-600 rounded-lg p-2 text-xs text-white focus:ring-2 focus:ring-blue-500 outline-none h-16 resize-none"
                                 placeholder="What the agent says first..."
                             />
+                            <div className="text-[10px] text-gray-500 text-right mt-1">
+                                {customConfig.greeting.length}/{MAX_INPUT_LENGTHS.greeting}
+                            </div>
                         </div>
                     </div>
                 )}
