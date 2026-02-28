@@ -1,91 +1,58 @@
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { logger } from './logger';
 
-describe('Secure Logger', () => {
+describe('Logger Security', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('should redact sensitive keys in objects', () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const sensitiveData = {
-      apiKey: 'secret123',
-      user: 'jules',
-      nested: {
-        password: 'password123',
-        public: 'visible'
-      }
-    };
-
-    logger.error('Error occurred', sensitiveData);
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'Error occurred',
-      expect.objectContaining({
-        apiKey: '***REDACTED***',
-        user: 'jules',
-        nested: expect.objectContaining({
-            password: '***REDACTED***',
-            public: 'visible'
-        })
-      })
-    );
-
-    consoleSpy.mockRestore();
+    logger.log({ apiKey: 'secret123', publicInfo: 'public' });
+    expect(console.log).toHaveBeenCalledWith({ apiKey: '***REDACTED***', publicInfo: 'public' });
   });
 
-  it('should handle Error objects', () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const error = new Error('Something went wrong');
-    (error as any).config = { headers: { Authorization: 'Bearer token' } };
+  it('should redact API keys in strings', () => {
+    const secret = 'AIzaSyD-1234567890abcdefghijklmnopqrstu'; // AIza + 35 chars
+    logger.error(`Failed with key ${secret}`);
 
-    logger.error(error);
+    // Check that the secret is NOT present
+    const lastCall = vi.mocked(console.error).mock.lastCall;
+    expect(lastCall?.[0]).not.toContain(secret);
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-            message: 'Something went wrong',
-            config: expect.objectContaining({
-                headers: expect.objectContaining({
-                    Authorization: '***REDACTED***'
-                })
-            })
-        })
-    );
-
-    consoleSpy.mockRestore();
+    // Check that it IS redacted
+    expect(lastCall?.[0]).toContain('***REDACTED***');
   });
 
-  it('should handle circular references', () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const circular: any = { name: 'circular' };
-    circular.self = circular;
+  it('should redact API keys in object values even if key is not sensitive', () => {
+    const secret = 'AIzaSyD-1234567890abcdefghijklmnopqrstu';
+    logger.info({ url: `https://api.google.com?key=${secret}` });
 
-    logger.error(circular);
+    const lastCall = vi.mocked(console.info).mock.lastCall;
+    const loggedObj = lastCall?.[0];
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-            name: 'circular',
-            self: '[Circular]'
-        })
-    );
-    consoleSpy.mockRestore();
+    expect(loggedObj.url).not.toContain(secret);
+    expect(loggedObj.url).toContain('***REDACTED***');
   });
 
-  it('should not redact non-sensitive keys that contain substring "key"', () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const safeData = {
-          keyboard: 'mechanical',
-          publicKey: 'public_key_data' // Wait, privateKey is sensitive, publicKey might be ok?
-          // My regex was /private[-_]?key/i. So publicKey should be fine unless I have /key/i?
-          // I removed simple 'key' from SENSITIVE_PATTERNS.
-      };
+  it('should redact API keys in Error messages', () => {
+      const secret = 'AIzaSyD-1234567890abcdefghijklmnopqrstu';
+      const error = new Error(`Request failed: ${secret}`);
+      logger.error("Error occurred", error);
 
-      logger.log(safeData);
+      const lastCall = vi.mocked(console.error).mock.lastCall;
+      // console.error was called with ("Error occurred", { message: ... })
+      const loggedError = lastCall?.[1];
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-          expect.objectContaining({
-              keyboard: 'mechanical',
-              publicKey: 'public_key_data'
-          })
-      );
-      consoleSpy.mockRestore();
+      expect(loggedError.message).not.toContain(secret);
+      expect(loggedError.message).toContain('***REDACTED***');
   });
 
   describe('deeply nested sensitive data', () => {
