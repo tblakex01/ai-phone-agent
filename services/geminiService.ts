@@ -3,11 +3,14 @@ import { GoogleGenAI, Modality, LiveServerMessage } from "@google/genai";
 import { LIVE_MODEL_NAME, TTS_MODEL_NAME } from '../constants';
 import { logger } from "../utils/logger";
 
-if (!process.env.API_KEY) {
-  throw new Error("API_KEY environment variable not set");
+// Use import.meta.env instead of process.env for better security and standard Vite usage
+const apiKey = import.meta.env.GEMINI_API_KEY;
+
+if (!apiKey) {
+  throw new Error("GEMINI_API_KEY environment variable not set");
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey });
 
 export const generateGreetingAudio = async (text: string, voiceName: string): Promise<string> => {
   try {
