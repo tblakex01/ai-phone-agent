@@ -84,6 +84,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                             </div>
                             <input
                                 type="text"
+                                maxLength={MAX_INPUT_LENGTHS.name}
                                 value={customConfig.name}
                                 maxLength={MAX_INPUT_LENGTHS.name}
                                 onChange={(e) => handleConfigChange('name', e.target.value)}
@@ -110,6 +111,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                                 <span className="text-[10px] text-gray-500">{customConfig.systemInstruction.length}/{MAX_INPUT_LENGTHS.systemInstruction}</span>
                             </div>
                             <textarea 
+                                maxLength={MAX_INPUT_LENGTHS.systemInstruction}
                                 value={customConfig.systemInstruction}
                                 maxLength={MAX_INPUT_LENGTHS.systemInstruction}
                                 onChange={(e) => handleConfigChange('systemInstruction', e.target.value)}
@@ -124,6 +126,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCall }) => {
                                 <span className="text-[10px] text-gray-500">{customConfig.greeting.length}/{MAX_INPUT_LENGTHS.greeting}</span>
                             </div>
                             <textarea 
+                                maxLength={MAX_INPUT_LENGTHS.greeting}
                                 value={customConfig.greeting}
                                 maxLength={MAX_INPUT_LENGTHS.greeting}
                                 onChange={(e) => handleConfigChange('greeting', e.target.value)}
