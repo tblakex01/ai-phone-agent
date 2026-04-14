@@ -246,4 +246,216 @@ describe('geminiService', () => {
       );
     });
   });
+
+  describe('error handling paths', () => {
+    describe('generateGreetingAudio error scenarios', () => {
+      it('should handle network timeout errors', async () => {
+        const timeoutError = new Error('Network request timed out');
+        timeoutError.name = 'TimeoutError';
+        mockGenerateContent.mockRejectedValueOnce(timeoutError);
+
+        await expect(
+          generateGreetingAudio('Hello', 'Kore')
+        ).rejects.toThrow('Network request timed out');
+      });
+
+      it('should handle API rate limit errors with status code', async () => {
+        const rateLimitError = new Error('Rate limit exceeded');
+        (rateLimitError as any).status = 429;
+        (rateLimitError as any).statusText = 'Too Many Requests';
+        mockGenerateContent.mockRejectedValueOnce(rateLimitError);
+
+        await expect(
+          generateGreetingAudio('Hello', 'Kore')
+        ).rejects.toThrow('Rate limit exceeded');
+      });
+
+      it('should handle authentication failures', async () => {
+        const authError = new Error('Invalid API key');
+        (authError as any).status = 401;
+        mockGenerateContent.mockRejectedValueOnce(authError);
+
+        await expect(
+          generateGreetingAudio('Hello', 'Kore')
+        ).rejects.toThrow('Invalid API key');
+      });
+
+      it('should handle null candidates array', async () => {
+        mockGenerateContent.mockResolvedValueOnce({
+          candidates: null,
+        });
+
+        await expect(
+          generateGreetingAudio('Hello', 'Kore')
+        ).rejects.toThrow('No audio data received from TTS API.');
+      });
+
+      it('should handle undefined response', async () => {
+        mockGenerateContent.mockResolvedValueOnce(undefined);
+
+        await expect(
+          generateGreetingAudio('Hello', 'Kore')
+        ).rejects.toThrow();
+      });
+
+      it('should handle empty content in candidate', async () => {
+        mockGenerateContent.mockResolvedValueOnce({
+          candidates: [{ content: null }],
+        });
+
+        await expect(
+          generateGreetingAudio('Hello', 'Kore')
+        ).rejects.toThrow('No audio data received from TTS API.');
+      });
+
+      it('should handle empty parts array', async () => {
+        mockGenerateContent.mockResolvedValueOnce({
+          candidates: [
+            {
+              content: {
+                parts: [],
+              },
+            },
+          ],
+        });
+
+        await expect(
+          generateGreetingAudio('Hello', 'Kore')
+        ).rejects.toThrow('No audio data received from TTS API.');
+      });
+
+      it('should handle inlineData with empty data string', async () => {
+        mockGenerateContent.mockResolvedValueOnce({
+          candidates: [
+            {
+              content: {
+                parts: [{ inlineData: { data: '' } }],
+              },
+            },
+          ],
+        });
+
+        await expect(
+          generateGreetingAudio('Hello', 'Kore')
+        ).rejects.toThrow('No audio data received from TTS API.');
+      });
+
+      it('should handle server error (500)', async () => {
+        const serverError = new Error('Internal server error');
+        (serverError as any).status = 500;
+        mockGenerateContent.mockRejectedValueOnce(serverError);
+
+        await expect(
+          generateGreetingAudio('Hello', 'Kore')
+        ).rejects.toThrow('Internal server error');
+      });
+
+      it('should handle service unavailable (503)', async () => {
+        const unavailableError = new Error('Service temporarily unavailable');
+        (unavailableError as any).status = 503;
+        mockGenerateContent.mockRejectedValueOnce(unavailableError);
+
+        await expect(
+          generateGreetingAudio('Hello', 'Kore')
+        ).rejects.toThrow('Service temporarily unavailable');
+      });
+    });
+
+    describe('connectToLiveSession error scenarios', () => {
+      it('should handle connection rejection', async () => {
+        const connectionError = new Error('Failed to establish WebSocket connection');
+        mockConnect.mockRejectedValueOnce(connectionError);
+
+        const callbacks = {
+          onOpen: vi.fn(),
+          onMessage: vi.fn(),
+          onError: vi.fn(),
+          onClose: vi.fn(),
+        };
+
+        const result = connectToLiveSession(callbacks, 'Test', 'Kore');
+
+        await expect(result).rejects.toThrow('Failed to establish WebSocket connection');
+      });
+
+      it('should handle network failure during connection', async () => {
+        const networkError = new Error('Network failure');
+        networkError.name = 'NetworkError';
+        mockConnect.mockRejectedValueOnce(networkError);
+
+        const callbacks = {
+          onOpen: vi.fn(),
+          onMessage: vi.fn(),
+          onError: vi.fn(),
+          onClose: vi.fn(),
+        };
+
+        const result = connectToLiveSession(callbacks, 'Test', 'Kore');
+
+        await expect(result).rejects.toThrow('Network failure');
+      });
+
+      it('should handle invalid API key during connection', async () => {
+        const authError = new Error('API key invalid');
+        (authError as any).code = 'AUTH_ERROR';
+        mockConnect.mockRejectedValueOnce(authError);
+
+        const callbacks = {
+          onOpen: vi.fn(),
+          onMessage: vi.fn(),
+          onError: vi.fn(),
+          onClose: vi.fn(),
+        };
+
+        const result = connectToLiveSession(callbacks, 'Test', 'Kore');
+
+        await expect(result).rejects.toThrow('API key invalid');
+      });
+
+      it('should pass callbacks even when connection fails later', () => {
+        const mockSession = {
+          close: vi.fn(),
+          send: vi.fn(),
+        };
+        mockConnect.mockReturnValue(Promise.resolve(mockSession));
+
+        const callbacks = {
+          onOpen: vi.fn(),
+          onMessage: vi.fn(),
+          onError: vi.fn(),
+          onClose: vi.fn(),
+        };
+
+        connectToLiveSession(callbacks, 'Test instruction', 'Kore');
+
+        expect(mockConnect).toHaveBeenCalledWith(
+          expect.objectContaining({
+            callbacks: expect.objectContaining({
+              onopen: callbacks.onOpen,
+              onmessage: callbacks.onMessage,
+              onerror: callbacks.onError,
+              onclose: callbacks.onClose,
+            }),
+          })
+        );
+      });
+
+      it('should handle timeout during connection', async () => {
+        const timeoutError = new Error('Connection timed out');
+        timeoutError.name = 'TimeoutError';
+        mockConnect.mockRejectedValueOnce(timeoutError);
+
+        const callbacks = {
+          onOpen: vi.fn(),
+          onMessage: vi.fn(),
+          onError: vi.fn(),
+          onClose: vi.fn(),
+        };
+
+        const result = connectToLiveSession(callbacks, 'Test', 'Kore');
+
+        await expect(result).rejects.toThrow('Connection timed out');
+      });
+    });
+  });
 });

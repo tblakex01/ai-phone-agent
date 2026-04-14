@@ -71,7 +71,28 @@ export async function decodeAudioData(
   sampleRate: number,
   numChannels: number,
 ): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
+  // Int16 requires even byte length
+  if (data.byteLength % 2 !== 0) {
+    throw new RangeError('byte length of Int16Array should be a multiple of 2');
+  }
+
+  // Create Int16Array view with correct offset and length.
+  // When data is a subarray/view of a larger buffer, data.buffer refers to the
+  // entire original buffer. We must use byteOffset and byteLength to get the
+  // correct portion. If byteOffset is not aligned for Int16 (odd), copy the
+  // data to a new aligned buffer first.
+  let dataInt16: Int16Array;
+  if (data.byteOffset % 2 === 0) {
+    dataInt16 = new Int16Array(data.buffer, data.byteOffset, data.byteLength / 2);
+  } else {
+    // Copy to a new buffer to ensure alignment using ArrayBuffer.slice directly
+    // to avoid an intermediate Uint8Array allocation
+    const alignedBuffer = data.buffer.slice(
+      data.byteOffset,
+      data.byteOffset + data.byteLength,
+    );
+    dataInt16 = new Int16Array(alignedBuffer);
+  }
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
 
