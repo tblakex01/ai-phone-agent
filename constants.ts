@@ -1,5 +1,7 @@
 import { PersonaConfig, VoiceName } from "./types";
 
+export const MAX_TRANSCRIPTION_HISTORY = 100;
+
 export const LIVE_MODEL_NAME = 'gemini-2.5-flash-native-audio-preview-09-2025';
 export const TTS_MODEL_NAME = 'gemini-2.5-flash-preview-tts';
 
