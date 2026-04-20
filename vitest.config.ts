@@ -4,6 +4,9 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    'import.meta.env.GEMINI_API_KEY': JSON.stringify('test-gemini-api-key'),
+  },
   test: {
     environment: 'jsdom',
     globals: true,
